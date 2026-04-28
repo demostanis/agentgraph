@@ -17,8 +17,8 @@
     "node:search:title": "scripts/search-nodes-by-title.sh",
     "node:search:content": "scripts/search-nodes-by-content.sh",
     "node:check-links": "scripts/check-node-links.sh",
-    "node:test": "scripts/test-node-scripts.sh",
-    "screenshot": "node scripts/screenshot.mjs"
+    "node:test": "dev-scripts/test-node-scripts.sh",
+    "screenshot": "node dev-scripts/screenshot.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
