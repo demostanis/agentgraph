@@ -11,10 +11,13 @@
     "web:build": "tsc && vite build",
     "web:preview": "vite preview --host 0.0.0.0",
     "tauri": "tauri",
+    "node:add": "scripts/add-node.sh",
     "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "d3-force": "^3.0.0",
+    "highlight.js": "^11.11.1",
+    "mermaid": "^11.14.0",
     "three": "^0.176.0"
   },
   "devDependencies": {

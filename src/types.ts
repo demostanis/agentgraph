@@ -12,6 +12,8 @@ export type InteractionMode = "idle" | "drag-node" | "pan-camera";
 export interface GraphNode extends SimulationNodeDatum {
   id: string;
   label: string;
+  markdown: string;
+  outboundLinks: string[];
   group: number;
   radius: number;
   renderX: number;
@@ -30,4 +32,11 @@ export interface GraphLink extends SimulationLinkDatum<GraphNode> {
 export type Graph = {
   nodes: GraphNode[];
   links: GraphLink[];
+};
+
+export type NodeDocument = {
+  slug: string;
+  title: string;
+  markdown: string;
+  links: string[];
 };

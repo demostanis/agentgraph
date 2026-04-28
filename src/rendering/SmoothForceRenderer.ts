@@ -250,6 +250,15 @@ export class SmoothForceRenderer {
     this.cameraController.resetView(immediate);
   }
 
+  selectNodeByTitle(title: string): void {
+    const normalizedTitle = title.trim().toLowerCase();
+    const index = this.nodes.findIndex((node) => node.label.trim().toLowerCase() === normalizedTitle);
+
+    if (index !== -1) {
+      this.selectNode(index);
+    }
+  }
+
   clearSelection = (): void => {
     this.selectedIndex = -1;
     this.hoveredIndex = -1;

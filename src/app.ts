@@ -1,4 +1,4 @@
-import { createDemoGraph } from "./data/demoGraph";
+import { createNodeGraph } from "./data/nodeGraph";
 import { SmoothForceRenderer } from "./rendering/SmoothForceRenderer";
 import { createForceSimulation } from "./simulation/forceSimulation";
 import { NodePanel } from "./ui/nodePanel";
@@ -10,10 +10,13 @@ export type AppController = {
 
 export function mountApp(app: HTMLDivElement): AppController {
   const elements = mountShell(app);
-  const graph = createDemoGraph();
+  const graph = createNodeGraph();
   const simulation = createForceSimulation(graph.nodes, graph.links);
-  const nodePanel = new NodePanel(elements.nodePanel, elements.nodeContent, elements.backButton);
-  const renderer = new SmoothForceRenderer({
+  let renderer: SmoothForceRenderer;
+  const nodePanel = new NodePanel(elements.nodePanel, elements.nodePanelToggle, elements.nodeContent, elements.backButton, {
+    onNodeLinkClick: (title) => renderer.selectNodeByTitle(title),
+  });
+  renderer = new SmoothForceRenderer({
     container: elements.stage,
     panelElement: elements.nodePanel,
     nodes: graph.nodes,
@@ -30,6 +33,7 @@ export function mountApp(app: HTMLDivElement): AppController {
   return {
     destroy: () => {
       elements.backButton.removeEventListener("click", renderer.clearSelection);
+      nodePanel.dispose();
       renderer.dispose();
       app.replaceChildren();
     },

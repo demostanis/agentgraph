@@ -3,6 +3,7 @@ export function renderMarkdown(markdown: string): string {
   const html: string[] = [];
   let inList = false;
   let inCode = false;
+  let codeLanguage = "";
   let codeLines: string[] = [];
 
   const closeList = (): void => {
@@ -15,11 +16,19 @@ export function renderMarkdown(markdown: string): string {
   lines.forEach((line) => {
     if (line.startsWith("```")) {
       if (inCode) {
-        html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+        const code = escapeHtml(codeLines.join("\n"));
+        const languageClass = getLanguageClass(codeLanguage);
+        html.push(
+          codeLanguage === "mermaid"
+            ? `<div class="mermaid-diagram" aria-busy="true"><div class="mermaid">${code}</div><div class="mermaid-loading" aria-hidden="true"><span></span></div></div>`
+            : `<pre><code${languageClass}>${code}</code></pre>`,
+        );
         codeLines = [];
+        codeLanguage = "";
         inCode = false;
       } else {
         closeList();
+        codeLanguage = line.slice(3).trim().toLowerCase();
         inCode = true;
       }
       return;
@@ -65,9 +74,15 @@ export function renderMarkdown(markdown: string): string {
 
 function formatInline(value: string): string {
   return escapeHtml(value)
+    .replace(/\[\[([^\]]+)\]\]/g, (_match, title: string) => `<a href="#" data-node-link="${title}">${title}</a>`)
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/_([^_]+)_/g, "<em>$1</em>");
+}
+
+function getLanguageClass(language: string): string {
+  const normalized = language.replace(/[^a-z0-9_-]/gi, "").toLowerCase();
+  return normalized ? ` class="language-${normalized}"` : "";
 }
 
 function escapeHtml(value: string): string {

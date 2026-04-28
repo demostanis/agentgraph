@@ -1,5 +1,7 @@
 node_modules/
 dist/
 artifacts/
-page.png
+/collapsed.png
+/expanded.png
+/page*.png
 src-tauri/target/
