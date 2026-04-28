@@ -1,3 +1,5 @@
 node_modules/
 dist/
 artifacts/
+page.png
+src-tauri/target/

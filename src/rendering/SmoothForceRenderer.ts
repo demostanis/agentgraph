@@ -9,6 +9,8 @@ import { createGlowPointMaterial } from "./glowMaterial";
 import { createTopology } from "./topology";
 
 const ACCENT_COLOR = new THREE.Color(ACCENT_COLOR_HEX);
+const BACKGROUND_CLICK_DISTANCE = 6;
+const BACKGROUND_CLEAR_NODE_PADDING = 56;
 
 type SmoothForceRendererCallbacks = {
   onNodeSelect?: (node: GraphNode, linkCount: number) => void;
@@ -62,9 +64,17 @@ export class SmoothForceRenderer {
   private readonly dragOffset = new THREE.Vector2();
   private readonly panAnchor = new THREE.Vector2();
   private readonly pointerDownScreen = new THREE.Vector2();
+  private readonly wheelPointer = new THREE.Vector2();
+  private readonly labelProjection = new THREE.Vector3();
   private readonly fixedStep = 1 / 60;
   private readonly cameraController: CameraController;
   private readonly inputController: InputController;
+  private readonly defaultPixelRatio = Math.min(window.devicePixelRatio, 2);
+  private readonly interactionPixelRatio = Math.min(window.devicePixelRatio, 1.15);
+  private readonly labelVisible: boolean[];
+  private readonly labelActive: boolean[];
+  private readonly labelLinked: boolean[];
+  private readonly labelOpacity: string[];
   private readonly container: HTMLDivElement;
   private readonly nodes: GraphNode[];
   private readonly links: GraphLink[];
@@ -73,8 +83,17 @@ export class SmoothForceRenderer {
   private overlayLevel = 0;
   private animationFrame = 0;
   private accumulator = 0;
+  private pendingWheelDelta = 0;
+  private wheelCooldownFrames = 0;
+  private currentPixelRatio = this.defaultPixelRatio;
+  private viewportLeft = 0;
+  private viewportTop = 0;
+  private viewportWidth = 1;
+  private viewportHeight = 1;
   private draggedNode: GraphNode | null = null;
   private pointerDownNodeIndex = -1;
+  private pointerDownWasBackground = false;
+  private pointerDownWasFarFromNodes = false;
   private selectedIndex = -1;
   private selectionAutoFollow = false;
   private hoveredIndex = -1;
@@ -93,7 +112,7 @@ export class SmoothForceRenderer {
     this.webgl = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     this.webgl.setClearColor(0x000000, 0);
     this.webgl.outputColorSpace = THREE.SRGBColorSpace;
-    this.webgl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.webgl.setPixelRatio(this.defaultPixelRatio);
     this.webgl.domElement.style.touchAction = "none";
     this.container.appendChild(this.webgl.domElement);
     this.nodeLabels = this.nodes.map((node) => {
@@ -111,6 +130,10 @@ export class SmoothForceRenderer {
     this.linkPositions = new Float32Array(this.links.length * 6);
     this.highlightLinkPositions = new Float32Array(this.links.length * 6);
     this.focusLevels = this.nodes.map(() => 0);
+    this.labelVisible = this.nodes.map(() => false);
+    this.labelActive = this.nodes.map(() => false);
+    this.labelLinked = this.nodes.map(() => false);
+    this.labelOpacity = this.nodes.map(() => "0");
     const topology = createTopology(this.nodes, this.links);
     this.linkedNodesByNode = topology.linkedNodesByNode;
     this.linkedLinksByNode = topology.linkedLinksByNode;
@@ -281,21 +304,64 @@ export class SmoothForceRenderer {
     this.animationFrame = window.requestAnimationFrame(this.animate);
     const delta = Math.min(this.clock.getDelta(), 0.04);
     this.accumulator += delta;
+    const isWheelZooming = this.applyPendingWheelZoom() || this.wheelCooldownFrames > 0;
+    this.setInteractionQuality(isWheelZooming);
 
-    let steps = 0;
-    while (this.accumulator >= this.fixedStep && steps < 4) {
-      if (this.simulation.alpha() > this.simulation.alphaMin()) {
-        this.simulation.tick();
+    if (isWheelZooming) {
+      this.accumulator = 0;
+    } else {
+      let steps = 0;
+      while (this.accumulator >= this.fixedStep && steps < 4) {
+        if (this.simulation.alpha() > this.simulation.alphaMin()) {
+          this.simulation.tick();
+        }
+        this.accumulator -= this.fixedStep;
+        steps += 1;
       }
-      this.accumulator -= this.fixedStep;
-      steps += 1;
     }
 
     this.updateSelectedCameraTarget();
     this.cameraController.update(delta);
-    this.updateMeshes(delta);
+    if (isWheelZooming && !this.draggedNode) {
+      this.updateCameraOnlyVisuals();
+    } else {
+      this.updateMeshes(delta);
+    }
     this.webgl.render(this.scene, this.camera);
+
+    if (this.wheelCooldownFrames > 0) {
+      this.wheelCooldownFrames -= 1;
+    }
   };
+
+  private setInteractionQuality(isInteracting: boolean): void {
+    const nextPixelRatio = isInteracting ? this.interactionPixelRatio : this.defaultPixelRatio;
+
+    if (Math.abs(nextPixelRatio - this.currentPixelRatio) < 0.01) {
+      return;
+    }
+
+    this.currentPixelRatio = nextPixelRatio;
+    this.webgl.setPixelRatio(nextPixelRatio);
+    this.webgl.setSize(this.viewportWidth, this.viewportHeight, false);
+  }
+
+  private applyPendingWheelZoom(): boolean {
+    if (this.pendingWheelDelta === 0) {
+      return false;
+    }
+
+    const wheelDelta = this.pendingWheelDelta;
+    this.pendingWheelDelta = 0;
+    return this.cameraController.zoomAtPointer(this.wheelPointer, wheelDelta);
+  }
+
+  private updateCameraOnlyVisuals(): void {
+    this.updateDimPlane();
+    this.updateLabels();
+    this.nodeGlowMaterial.uniforms.cameraZoom.value = this.camera.zoom;
+    this.hoverGlowMaterial.uniforms.cameraZoom.value = this.camera.zoom;
+  }
 
   private updateMeshes(delta: number): void {
     const defaultBlend = 1 - Math.exp(-delta * 12);
@@ -358,6 +424,7 @@ export class SmoothForceRenderer {
     this.hoverGlowGeometry.getAttribute("pointSize").needsUpdate = true;
     this.hoverGlowGeometry.getAttribute("pointOpacity").needsUpdate = true;
     this.nodeMesh.instanceMatrix.needsUpdate = true;
+    this.nodeMesh.computeBoundingSphere();
     this.connectedNodeMesh.instanceMatrix.needsUpdate = true;
     this.accentNodeMesh.instanceMatrix.needsUpdate = true;
 
@@ -389,10 +456,7 @@ export class SmoothForceRenderer {
     this.accentNodeMaterial.opacity = level;
     this.highlightLinkMaterial.opacity = level;
 
-    const visibleWidth = Math.max(this.container.clientWidth, 1) / this.camera.zoom;
-    const visibleHeight = Math.max(this.container.clientHeight, 1) / this.camera.zoom;
-    this.dimPlane.position.set(this.camera.position.x, this.camera.position.y, 0.16);
-    this.dimPlane.scale.set(visibleWidth, visibleHeight, 1);
+    this.updateDimPlane();
 
     let offset = 0;
     if (hasFocus) {
@@ -415,35 +479,105 @@ export class SmoothForceRenderer {
   }
 
   private updateLabels(): void {
-    const rect = this.webgl.domElement.getBoundingClientRect();
     const zoom = this.camera.zoom;
     const activeIndex = this.selectedIndex !== -1 ? this.selectedIndex : this.hoveredIndex;
     const linkedNodes = activeIndex !== -1 ? this.linkedNodesByNode[activeIndex] : null;
     const zoomShowsLabels = zoom >= 0.78;
 
+    if (!zoomShowsLabels) {
+      this.hideVisibleLabels();
+      return;
+    }
+
     this.nodes.forEach((node, index) => {
-      const label = this.nodeLabels[index];
       const isActive = index === activeIndex;
       const isLinked = linkedNodes?.has(index) ?? false;
       const visible = zoomShowsLabels && (this.selectedIndex === -1 || isLinked);
-      const position = new THREE.Vector3(node.renderX, node.renderY, 0.32).project(this.camera);
-      const screenX = (position.x * 0.5 + 0.5) * rect.width;
-      const screenY = (-position.y * 0.5 + 0.5) * rect.height;
+
+      if (!visible) {
+        this.hideLabel(index);
+        return;
+      }
+
+      const position = this.labelProjection.set(node.renderX, node.renderY, 0.32).project(this.camera);
+      const isInViewport = position.x > -1.12 && position.x < 1.12 && position.y > -1.12 && position.y < 1.12;
+
+      if (!isInViewport) {
+        this.hideLabel(index);
+        return;
+      }
+
+      const label = this.nodeLabels[index];
+      const screenX = (position.x * 0.5 + 0.5) * this.viewportWidth;
+      const screenY = (-position.y * 0.5 + 0.5) * this.viewportHeight;
       const nodeRadiusPx = node.radius * zoom;
       const scale = 1 + this.focusLevels[index] * 0.24;
+      const opacity = isActive ? "1" : "0.78";
 
-      label.style.left = `${screenX}px`;
-      label.style.top = `${screenY + nodeRadiusPx + 7}px`;
-      label.style.opacity = visible ? (isActive ? "1" : "0.78") : "0";
-      label.style.transform = `translate(-50%, 0) scale(${scale.toFixed(3)})`;
-      label.classList.toggle("is-active", isActive && visible);
-      label.classList.toggle("is-linked", isLinked && visible && !isActive);
+      label.style.transform = `translate3d(${screenX.toFixed(1)}px, ${(screenY + nodeRadiusPx + 7).toFixed(1)}px, 0) translate(-50%, 0) scale(${scale.toFixed(3)})`;
+      this.showLabel(index, opacity, isActive, isLinked && !isActive);
     });
+  }
+
+  private updateDimPlane(): void {
+    const visibleWidth = this.viewportWidth / this.camera.zoom;
+    const visibleHeight = this.viewportHeight / this.camera.zoom;
+    this.dimPlane.position.set(this.camera.position.x, this.camera.position.y, 0.16);
+    this.dimPlane.scale.set(visibleWidth, visibleHeight, 1);
+  }
+
+  private showLabel(index: number, opacity: string, isActive: boolean, isLinked: boolean): void {
+    const label = this.nodeLabels[index];
+
+    if (!this.labelVisible[index] || this.labelOpacity[index] !== opacity) {
+      label.style.opacity = opacity;
+      this.labelOpacity[index] = opacity;
+    }
+
+    if (this.labelActive[index] !== isActive) {
+      label.classList.toggle("is-active", isActive);
+      this.labelActive[index] = isActive;
+    }
+
+    if (this.labelLinked[index] !== isLinked) {
+      label.classList.toggle("is-linked", isLinked);
+      this.labelLinked[index] = isLinked;
+    }
+
+    this.labelVisible[index] = true;
+  }
+
+  private hideVisibleLabels(): void {
+    this.labelVisible.forEach((visible, index) => {
+      if (visible) {
+        this.hideLabel(index);
+      }
+    });
+  }
+
+  private hideLabel(index: number): void {
+    if (!this.labelVisible[index]) {
+      return;
+    }
+
+    const label = this.nodeLabels[index];
+    label.style.opacity = "0";
+    label.classList.remove("is-active", "is-linked");
+    this.labelVisible[index] = false;
+    this.labelActive[index] = false;
+    this.labelLinked[index] = false;
+    this.labelOpacity[index] = "0";
   }
 
   private resize(): void {
     const width = Math.max(this.container.clientWidth, 1);
     const height = Math.max(this.container.clientHeight, 1);
+    const bounds = this.container.getBoundingClientRect();
+
+    this.viewportLeft = bounds.left;
+    this.viewportTop = bounds.top;
+    this.viewportWidth = Math.max(bounds.width, width, 1);
+    this.viewportHeight = Math.max(bounds.height, height, 1);
 
     this.cameraController.resize();
     this.webgl.setSize(width, height, false);
@@ -471,6 +605,8 @@ export class SmoothForceRenderer {
     this.container.setPointerCapture(event.pointerId);
     this.pointerDownScreen.set(event.clientX, event.clientY);
     this.pointerDownNodeIndex = -1;
+    this.pointerDownWasBackground = false;
+    this.pointerDownWasFarFromNodes = false;
     const hitIndex = this.getNodeAtPointer(event);
 
     if (hitIndex !== -1) {
@@ -497,6 +633,8 @@ export class SmoothForceRenderer {
       this.selectionAutoFollow = false;
     }
     this.hoveredIndex = -1;
+    this.pointerDownWasBackground = true;
+    this.pointerDownWasFarFromNodes = this.isPointerFarFromNodes(event);
     this.interactionMode = "pan-camera";
     this.setInteractionClasses();
   };
@@ -547,12 +685,22 @@ export class SmoothForceRenderer {
       this.simulation.alphaTarget(0).alpha(Math.max(this.simulation.alpha(), 0.18));
     }
 
-    if (this.pointerDownNodeIndex !== -1 && clickDistance < 6) {
+    if (this.pointerDownNodeIndex !== -1 && clickDistance < BACKGROUND_CLICK_DISTANCE) {
       this.selectNode(this.pointerDownNodeIndex);
+    } else if (
+      this.pointerDownWasBackground &&
+      this.pointerDownWasFarFromNodes &&
+      clickDistance < BACKGROUND_CLICK_DISTANCE &&
+      this.selectedIndex !== -1 &&
+      this.isPointerFarFromNodes(event)
+    ) {
+      this.clearSelection();
     }
 
     this.interactionMode = "idle";
     this.pointerDownNodeIndex = -1;
+    this.pointerDownWasBackground = false;
+    this.pointerDownWasFarFromNodes = false;
     this.setInteractionClasses();
   };
 
@@ -571,7 +719,9 @@ export class SmoothForceRenderer {
       this.selectionAutoFollow = false;
     }
     this.updatePointer(event);
-    this.cameraController.zoomAtPointer(this.pointer, this.normalizeWheelDelta(event));
+    this.wheelPointer.copy(this.pointer);
+    this.pendingWheelDelta += this.normalizeWheelDelta(event);
+    this.wheelCooldownFrames = 18;
   };
 
   private getNodeAtPointer(event: PointerEvent): number {
@@ -581,6 +731,24 @@ export class SmoothForceRenderer {
 
     const hit = this.raycaster.intersectObject(this.nodeMesh, false)[0];
     return hit?.instanceId ?? -1;
+  }
+
+  private isPointerFarFromNodes(event: PointerEvent): boolean {
+    const screenX = event.clientX - this.viewportLeft;
+    const screenY = event.clientY - this.viewportTop;
+
+    return this.nodes.every((node) => {
+      const position = this.labelProjection.set(node.renderX, node.renderY, 0.32).project(this.camera);
+
+      if (position.x < -1.2 || position.x > 1.2 || position.y < -1.2 || position.y > 1.2) {
+        return true;
+      }
+
+      const nodeScreenX = (position.x * 0.5 + 0.5) * this.viewportWidth;
+      const nodeScreenY = (-position.y * 0.5 + 0.5) * this.viewportHeight;
+      const clearRadius = node.radius * this.camera.zoom + BACKGROUND_CLEAR_NODE_PADDING;
+      return Math.hypot(screenX - nodeScreenX, screenY - nodeScreenY) > clearRadius;
+    });
   }
 
   private getWorldAtPointer(event: PointerEvent | WheelEvent): THREE.Vector2 {
@@ -601,11 +769,8 @@ export class SmoothForceRenderer {
   }
 
   private updatePointer(event: PointerEvent | WheelEvent): void {
-    const rect = this.webgl.domElement.getBoundingClientRect();
-    const width = Math.max(rect.width, 1);
-    const height = Math.max(rect.height, 1);
-    this.pointer.x = ((event.clientX - rect.left) / width) * 2 - 1;
-    this.pointer.y = -((event.clientY - rect.top) / height) * 2 + 1;
+    this.pointer.x = ((event.clientX - this.viewportLeft) / this.viewportWidth) * 2 - 1;
+    this.pointer.y = -((event.clientY - this.viewportTop) / this.viewportHeight) * 2 + 1;
   }
 
   private selectNode(index: number): void {
