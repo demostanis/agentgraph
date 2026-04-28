@@ -12,9 +12,16 @@
     "web:preview": "vite preview --host 0.0.0.0",
     "tauri": "tauri",
     "node:add": "scripts/add-node.sh",
+    "node:get": "scripts/get-node-content.sh",
+    "node:edit": "scripts/edit-node-content.sh",
+    "node:search:title": "scripts/search-nodes-by-title.sh",
+    "node:search:content": "scripts/search-nodes-by-content.sh",
+    "node:check-links": "scripts/check-node-links.sh",
+    "node:test": "scripts/test-node-scripts.sh",
     "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
     "d3-force": "^3.0.0",
     "highlight.js": "^11.11.1",
     "mermaid": "^11.14.0",

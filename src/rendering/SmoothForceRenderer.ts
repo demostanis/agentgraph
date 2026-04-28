@@ -11,6 +11,8 @@ import { createTopology } from "./topology";
 const ACCENT_COLOR = new THREE.Color(ACCENT_COLOR_HEX);
 const BACKGROUND_CLICK_DISTANCE = 6;
 const BACKGROUND_CLEAR_NODE_PADDING = 56;
+const DEFAULT_NODE_CAPACITY = 4096;
+const DEFAULT_LINK_CAPACITY = 16384;
 
 type SmoothForceRendererCallbacks = {
   onNodeSelect?: (node: GraphNode, linkCount: number) => void;
@@ -58,9 +60,10 @@ export class SmoothForceRenderer {
   private readonly highlightLinkGeometry = new THREE.BufferGeometry();
   private readonly highlightLinkPositions: Float32Array;
   private readonly highlightLinkMaterial: THREE.LineBasicMaterial;
-  private readonly focusLevels: number[];
-  private readonly linkedNodesByNode: Array<Set<number>>;
-  private readonly linkedLinksByNode: Array<Set<number>>;
+  private focusLevels: number[];
+  private appearanceLevels: number[];
+  private linkedNodesByNode: Array<Set<number>>;
+  private linkedLinksByNode: Array<Set<number>>;
   private readonly dragOffset = new THREE.Vector2();
   private readonly panAnchor = new THREE.Vector2();
   private readonly pointerDownScreen = new THREE.Vector2();
@@ -71,14 +74,16 @@ export class SmoothForceRenderer {
   private readonly inputController: InputController;
   private readonly defaultPixelRatio = Math.min(window.devicePixelRatio, 2);
   private readonly interactionPixelRatio = Math.min(window.devicePixelRatio, 1.15);
-  private readonly labelVisible: boolean[];
-  private readonly labelActive: boolean[];
-  private readonly labelLinked: boolean[];
-  private readonly labelOpacity: string[];
+  private labelVisible: boolean[];
+  private labelActive: boolean[];
+  private labelLinked: boolean[];
+  private labelOpacity: string[];
+  private readonly nodeCapacity: number;
+  private readonly linkCapacity: number;
   private readonly container: HTMLDivElement;
-  private readonly nodes: GraphNode[];
-  private readonly links: GraphLink[];
-  private readonly simulation: Simulation<GraphNode, GraphLink>;
+  private nodes: GraphNode[];
+  private links: GraphLink[];
+  private simulation: Simulation<GraphNode, GraphLink>;
   private readonly callbacks: SmoothForceRendererCallbacks;
   private overlayLevel = 0;
   private animationFrame = 0;
@@ -108,6 +113,8 @@ export class SmoothForceRenderer {
     this.links = links;
     this.simulation = simulation;
     this.callbacks = callbacks;
+    this.nodeCapacity = Math.max(DEFAULT_NODE_CAPACITY, this.nodes.length);
+    this.linkCapacity = Math.max(DEFAULT_LINK_CAPACITY, this.links.length);
 
     this.webgl = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     this.webgl.setClearColor(0x000000, 0);
@@ -115,21 +122,16 @@ export class SmoothForceRenderer {
     this.webgl.setPixelRatio(this.defaultPixelRatio);
     this.webgl.domElement.style.touchAction = "none";
     this.container.appendChild(this.webgl.domElement);
-    this.nodeLabels = this.nodes.map((node) => {
-      const label = document.createElement("span");
-      label.className = "node-label";
-      label.textContent = node.label;
-      this.container.appendChild(label);
-      return label;
-    });
+    this.nodeLabels = this.nodes.map((node) => this.createNodeLabel(node));
 
     this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);
     this.cameraController = new CameraController(this.camera, this.container, panelElement);
 
-    this.linkPositions = new Float32Array(this.links.length * 6);
-    this.highlightLinkPositions = new Float32Array(this.links.length * 6);
+    this.linkPositions = new Float32Array(this.linkCapacity * 6);
+    this.highlightLinkPositions = new Float32Array(this.linkCapacity * 6);
     this.focusLevels = this.nodes.map(() => 0);
+    this.appearanceLevels = this.nodes.map(() => 1);
     this.labelVisible = this.nodes.map(() => false);
     this.labelActive = this.nodes.map(() => false);
     this.labelLinked = this.nodes.map(() => false);
@@ -138,6 +140,7 @@ export class SmoothForceRenderer {
     this.linkedNodesByNode = topology.linkedNodesByNode;
     this.linkedLinksByNode = topology.linkedLinksByNode;
     this.linkGeometry.setAttribute("position", new THREE.BufferAttribute(this.linkPositions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.linkGeometry.setDrawRange(0, this.links.length * 2);
 
     const linkMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff,
@@ -171,18 +174,20 @@ export class SmoothForceRenderer {
     const nodeGeometry = new THREE.CircleGeometry(1, 48);
     const nodeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthTest: false, depthWrite: false });
 
-    this.nodeGlowPositions = new Float32Array(this.nodes.length * 3);
-    this.nodeGlowSizes = new Float32Array(this.nodes.length);
-    this.nodeGlowOpacities = new Float32Array(this.nodes.length).fill(0.5);
-    this.hoverGlowPositions = new Float32Array(this.nodes.length * 3);
-    this.hoverGlowSizes = new Float32Array(this.nodes.length);
-    this.hoverGlowOpacities = new Float32Array(this.nodes.length);
+    this.nodeGlowPositions = new Float32Array(this.nodeCapacity * 3);
+    this.nodeGlowSizes = new Float32Array(this.nodeCapacity);
+    this.nodeGlowOpacities = new Float32Array(this.nodeCapacity).fill(0.5);
+    this.hoverGlowPositions = new Float32Array(this.nodeCapacity * 3);
+    this.hoverGlowSizes = new Float32Array(this.nodeCapacity);
+    this.hoverGlowOpacities = new Float32Array(this.nodeCapacity);
     this.nodeGlowGeometry.setAttribute("position", new THREE.BufferAttribute(this.nodeGlowPositions, 3).setUsage(THREE.DynamicDrawUsage));
     this.nodeGlowGeometry.setAttribute("pointSize", new THREE.BufferAttribute(this.nodeGlowSizes, 1).setUsage(THREE.DynamicDrawUsage));
     this.nodeGlowGeometry.setAttribute("pointOpacity", new THREE.BufferAttribute(this.nodeGlowOpacities, 1).setUsage(THREE.DynamicDrawUsage));
+    this.nodeGlowGeometry.setDrawRange(0, this.nodes.length);
     this.hoverGlowGeometry.setAttribute("position", new THREE.BufferAttribute(this.hoverGlowPositions, 3).setUsage(THREE.DynamicDrawUsage));
     this.hoverGlowGeometry.setAttribute("pointSize", new THREE.BufferAttribute(this.hoverGlowSizes, 1).setUsage(THREE.DynamicDrawUsage));
     this.hoverGlowGeometry.setAttribute("pointOpacity", new THREE.BufferAttribute(this.hoverGlowOpacities, 1).setUsage(THREE.DynamicDrawUsage));
+    this.hoverGlowGeometry.setDrawRange(0, this.nodes.length);
 
     this.nodeGlowMaterial = createGlowPointMaterial();
     this.hoverGlowMaterial = createGlowPointMaterial(ACCENT_COLOR);
@@ -192,7 +197,8 @@ export class SmoothForceRenderer {
     nodeGlowPoints.renderOrder = 1.5;
     this.scene.add(nodeGlowPoints);
 
-    this.nodeMesh = new THREE.InstancedMesh(nodeGeometry, nodeMaterial, this.nodes.length);
+    this.nodeMesh = new THREE.InstancedMesh(nodeGeometry, nodeMaterial, this.nodeCapacity);
+    this.nodeMesh.count = this.nodes.length;
     this.nodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.nodeMesh.frustumCulled = false;
     this.nodeMesh.renderOrder = 2;
@@ -216,14 +222,16 @@ export class SmoothForceRenderer {
     this.scene.add(hoverGlowPoints);
 
     this.connectedNodeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
-    this.connectedNodeMesh = new THREE.InstancedMesh(nodeGeometry, this.connectedNodeMaterial, this.nodes.length);
+    this.connectedNodeMesh = new THREE.InstancedMesh(nodeGeometry, this.connectedNodeMaterial, this.nodeCapacity);
+    this.connectedNodeMesh.count = this.nodes.length;
     this.connectedNodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.connectedNodeMesh.frustumCulled = false;
     this.connectedNodeMesh.renderOrder = 6;
     this.scene.add(this.connectedNodeMesh);
 
     this.accentNodeMaterial = new THREE.MeshBasicMaterial({ color: ACCENT_COLOR, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
-    this.accentNodeMesh = new THREE.InstancedMesh(nodeGeometry, this.accentNodeMaterial, this.nodes.length);
+    this.accentNodeMesh = new THREE.InstancedMesh(nodeGeometry, this.accentNodeMaterial, this.nodeCapacity);
+    this.accentNodeMesh.count = this.nodes.length;
     this.accentNodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.accentNodeMesh.frustumCulled = false;
     this.accentNodeMesh.renderOrder = 8;
@@ -259,6 +267,82 @@ export class SmoothForceRenderer {
     }
   }
 
+  syncGraph(nodes: GraphNode[], links: GraphLink[], simulation: Simulation<GraphNode, GraphLink>): void {
+    if (nodes.length > this.nodeCapacity || links.length > this.linkCapacity) {
+      console.warn(
+        `Graph update skipped: capacity exceeded (${nodes.length}/${this.nodeCapacity} nodes, ${links.length}/${this.linkCapacity} links).`,
+      );
+      simulation.stop();
+      return;
+    }
+
+    const previousNodesById = new Map(this.nodes.map((node, index) => [node.id, { node, index }]));
+    const labelsById = new Map(this.nodes.map((node, index) => [node.id, this.nodeLabels[index]]));
+    const selectedId = this.selectedIndex === -1 ? null : this.nodes[this.selectedIndex]?.id ?? null;
+    const hoveredId = this.hoveredIndex === -1 ? null : this.nodes[this.hoveredIndex]?.id ?? null;
+
+    nodes.forEach((node) => {
+      const previous = previousNodesById.get(node.id);
+
+      if (previous) {
+        this.copyNodeLayout(previous.node, node);
+        return;
+      }
+
+      this.seedNewNodePosition(node, links, previousNodesById);
+    });
+
+    this.nodeLabels.forEach((label) => {
+      if (!nodes.some((node) => labelsById.get(node.id) === label)) {
+        label.remove();
+      }
+    });
+    this.nodeLabels.length = 0;
+    nodes.forEach((node) => {
+      const label = labelsById.get(node.id) ?? this.createNodeLabel(node);
+      label.textContent = node.label;
+      label.style.opacity = "0";
+      label.classList.remove("is-active", "is-linked");
+      this.nodeLabels.push(label);
+    });
+
+    this.simulation.stop();
+    this.simulation = simulation;
+    this.nodes = nodes;
+    this.links = links;
+
+    const topology = createTopology(this.nodes, this.links);
+    this.linkedNodesByNode = topology.linkedNodesByNode;
+    this.linkedLinksByNode = topology.linkedLinksByNode;
+    this.focusLevels = this.nodes.map(() => 0);
+    this.appearanceLevels = this.nodes.map((node) => (previousNodesById.has(node.id) ? 1 : 0));
+    this.labelVisible = this.nodes.map(() => false);
+    this.labelActive = this.nodes.map(() => false);
+    this.labelLinked = this.nodes.map(() => false);
+    this.labelOpacity = this.nodes.map(() => "0");
+    this.selectedIndex = selectedId ? this.nodes.findIndex((node) => node.id === selectedId) : -1;
+    this.hoveredIndex = hoveredId ? this.nodes.findIndex((node) => node.id === hoveredId) : -1;
+
+    if (this.selectedIndex === -1) {
+      this.selectionAutoFollow = false;
+      this.callbacks.onSelectionClear?.();
+    } else {
+      const selectedNode = this.nodes[this.selectedIndex];
+      this.callbacks.onNodeSelect?.(selectedNode, this.linkedLinksByNode[this.selectedIndex].size);
+    }
+
+    this.nodeMesh.count = this.nodes.length;
+    this.connectedNodeMesh.count = this.nodes.length;
+    this.accentNodeMesh.count = this.nodes.length;
+    this.nodeGlowGeometry.setDrawRange(0, this.nodes.length);
+    this.hoverGlowGeometry.setDrawRange(0, this.nodes.length);
+    this.linkGeometry.setDrawRange(0, this.links.length * 2);
+    this.highlightLinkGeometry.setDrawRange(0, 0);
+    this.simulation.alpha(Math.max(this.simulation.alpha(), 0.72));
+    this.updateMeshes(1 / 60);
+    this.setInteractionClasses();
+  }
+
   clearSelection = (): void => {
     this.selectedIndex = -1;
     this.hoveredIndex = -1;
@@ -279,6 +363,7 @@ export class SmoothForceRenderer {
     this.resizeObserver.disconnect();
     this.inputController.dispose();
     window.removeEventListener("visibilitychange", this.handleVisibilityChange);
+    this.container.classList.remove("is-hovering", "is-dragging-node", "is-panning", "has-selection");
     this.nodeLabels.forEach((label) => label.remove());
     this.disposeScene();
     this.webgl.domElement.remove();
@@ -293,6 +378,72 @@ export class SmoothForceRenderer {
     this.isAnimating = true;
     this.clock.getDelta();
     this.animate();
+  }
+
+  private createNodeLabel(node: GraphNode): HTMLSpanElement {
+    const label = document.createElement("span");
+    label.className = "node-label";
+    label.textContent = node.label;
+    this.container.appendChild(label);
+    return label;
+  }
+
+  private copyNodeLayout(source: GraphNode, target: GraphNode): void {
+    target.x = source.x;
+    target.y = source.y;
+    target.vx = source.vx;
+    target.vy = source.vy;
+    target.fx = source.fx;
+    target.fy = source.fy;
+    target.renderX = source.renderX;
+    target.renderY = source.renderY;
+    target.pulse = source.pulse;
+  }
+
+  private seedNewNodePosition(node: GraphNode, links: GraphLink[], previousNodesById: Map<string, { node: GraphNode; index: number }>): void {
+    const anchor = this.findExistingLinkedNode(node.id, links, previousNodesById);
+    const angle = this.hashAngle(node.id);
+    const distance = 82;
+    const x = anchor ? (anchor.x ?? anchor.renderX) + Math.cos(angle) * distance : node.x ?? 0;
+    const y = anchor ? (anchor.y ?? anchor.renderY) + Math.sin(angle) * distance : node.y ?? 0;
+
+    node.x = x;
+    node.y = y;
+    node.renderX = x;
+    node.renderY = y;
+    node.vx = 0;
+    node.vy = 0;
+  }
+
+  private findExistingLinkedNode(id: string, links: GraphLink[], previousNodesById: Map<string, { node: GraphNode; index: number }>): GraphNode | null {
+    for (const link of links) {
+      const sourceId = this.getEndpointId(link.source);
+      const targetId = this.getEndpointId(link.target);
+
+      if (sourceId === id) {
+        return previousNodesById.get(targetId)?.node ?? null;
+      }
+
+      if (targetId === id) {
+        return previousNodesById.get(sourceId)?.node ?? null;
+      }
+    }
+
+    return null;
+  }
+
+  private getEndpointId(endpoint: string | GraphNode): string {
+    return typeof endpoint === "string" ? endpoint : endpoint.id;
+  }
+
+  private hashAngle(value: string): number {
+    let hash = 0;
+
+    for (let index = 0; index < value.length; index += 1) {
+      hash = Math.imul(31, hash) + value.charCodeAt(index);
+    }
+
+    return ((hash >>> 0) / 4294967295) * Math.PI * 2;
   }
 
   private stopAnimation(): void {
@@ -375,10 +526,12 @@ export class SmoothForceRenderer {
   private updateMeshes(delta: number): void {
     const defaultBlend = 1 - Math.exp(-delta * 12);
     const focusBlend = 1 - Math.exp(-delta * 10);
+    const appearanceBlend = 1 - Math.exp(-delta * 9);
     const time = performance.now() * 0.001;
     const activeIndex = this.selectedIndex !== -1 ? this.selectedIndex : this.hoveredIndex;
 
     this.nodes.forEach((node, index) => {
+      this.appearanceLevels[index] += (1 - this.appearanceLevels[index]) * appearanceBlend;
       const blend = node === this.draggedNode ? 1 : defaultBlend;
       const x = node.x ?? 0;
       const y = node.y ?? 0;
@@ -387,9 +540,10 @@ export class SmoothForceRenderer {
 
       const targetFocus = index === activeIndex ? 1 : 0;
       this.focusLevels[index] += (targetFocus - this.focusLevels[index]) * focusBlend;
+      const appearance = this.appearanceLevels[index];
       const hoverScale = 1 + this.focusLevels[index] * 0.08;
       const pulseScale = 1 + Math.sin(time * 1.8 + node.pulse) * 0.02;
-      const radius = node.radius * hoverScale * pulseScale;
+      const radius = node.radius * hoverScale * pulseScale * appearance;
       const hasFocus = activeIndex !== -1;
       const isLinked = hasFocus && this.linkedNodesByNode[activeIndex].has(index);
       const isActive = index === activeIndex;
@@ -400,12 +554,13 @@ export class SmoothForceRenderer {
       this.nodeGlowPositions[glowOffset + 1] = node.renderY;
       this.nodeGlowPositions[glowOffset + 2] = 0.02;
       this.nodeGlowSizes[index] = radius * 6.2;
+      this.nodeGlowOpacities[index] = 0.5 * appearance;
 
       this.hoverGlowPositions[glowOffset] = node.renderX;
       this.hoverGlowPositions[glowOffset + 1] = node.renderY;
       this.hoverGlowPositions[glowOffset + 2] = 0.17;
       this.hoverGlowSizes[index] = Math.max(node.radius * 8.4, radius * 6.8);
-      this.hoverGlowOpacities[index] = hoverOpacity < 0.01 ? 0 : hoverOpacity;
+      this.hoverGlowOpacities[index] = hoverOpacity < 0.01 ? 0 : hoverOpacity * appearance;
 
       this.matrix.position.set(node.renderX, node.renderY, isActive ? 0.12 : 0.04);
       this.matrix.scale.setScalar(radius);
@@ -429,6 +584,7 @@ export class SmoothForceRenderer {
     this.hoverGlowMaterial.uniforms.cameraZoom.value = this.camera.zoom;
     this.nodeGlowGeometry.getAttribute("position").needsUpdate = true;
     this.nodeGlowGeometry.getAttribute("pointSize").needsUpdate = true;
+    this.nodeGlowGeometry.getAttribute("pointOpacity").needsUpdate = true;
     this.hoverGlowGeometry.getAttribute("position").needsUpdate = true;
     this.hoverGlowGeometry.getAttribute("pointSize").needsUpdate = true;
     this.hoverGlowGeometry.getAttribute("pointOpacity").needsUpdate = true;
@@ -448,6 +604,8 @@ export class SmoothForceRenderer {
       this.linkPositions[offset++] = target.renderY;
       this.linkPositions[offset++] = -0.04;
     });
+
+    this.linkGeometry.setDrawRange(0, this.links.length * 2);
 
     const position = this.linkGeometry.getAttribute("position") as THREE.BufferAttribute;
     position.needsUpdate = true;

@@ -38,4 +38,4 @@ fi
   printf '%s\n' "$markdown_content"
 } > "$node_file"
 
-printf 'Created %s\n' "$node_file"
+printf 'Created %s\n' "$title"

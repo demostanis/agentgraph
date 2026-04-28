@@ -5,21 +5,33 @@ import type { Graph, GraphLink, GraphNode, NodeDocument } from "../types";
 import { mulberry32 } from "../utils/random";
 
 const LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
-const markdownModules = import.meta.glob<string>("../../nodes/*.md", {
-  eager: true,
-  import: "default",
-  query: "?raw",
-});
+const NODES_CHANGED_EVENT = "nodes://changed";
 
-export function createNodeGraph(): Graph {
-  const documents = Object.entries(markdownModules)
-    .map(([path, markdown]) => parseNodeDocument(path, markdown))
-    .sort((a, b) => a.title.localeCompare(b.title));
+type RuntimeNodeFile = {
+  path: string;
+  markdown: string;
+};
+
+export async function loadNodeGraph(): Promise<Graph> {
+  return createGraph(await loadNodeDocuments());
+}
+
+export async function watchNodeGraph(onChange: () => void): Promise<() => void> {
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    return await listen(NODES_CHANGED_EVENT, onChange);
+  } catch {
+    return () => undefined;
+  }
+}
+
+function createGraph(documents: NodeDocument[]): Graph {
+  const sortedDocuments = documents.sort((a, b) => a.title.localeCompare(b.title));
 
   const random = mulberry32(1729);
   const nodeColor = new THREE.Color(NODE_COLOR_HEX);
-  const titleToIndex = new Map(documents.map((document, index) => [normalizeTitle(document.title), index]));
-  const nodes = documents.map<GraphNode>((document, index) => {
+  const titleToIndex = new Map(sortedDocuments.map((document, index) => [normalizeTitle(document.title), index]));
+  const nodes = sortedDocuments.map<GraphNode>((document, index) => {
     const group = index % CLUSTERS.length;
     const cluster = CLUSTERS[group];
     const angle = random() * Math.PI * 2;
@@ -46,7 +58,7 @@ export function createNodeGraph(): Graph {
   const links: GraphLink[] = [];
   const seen = new Set<string>();
 
-  documents.forEach((document, sourceIndex) => {
+  sortedDocuments.forEach((document, sourceIndex) => {
     document.links.forEach((linkTitle) => {
       const targetIndex = titleToIndex.get(normalizeTitle(linkTitle));
 
@@ -70,8 +82,27 @@ export function createNodeGraph(): Graph {
   return { nodes, links };
 }
 
+async function loadNodeDocuments(): Promise<NodeDocument[]> {
+  const runtimeNodeFiles = await readRuntimeNodeFiles();
+
+  if (runtimeNodeFiles) {
+    return runtimeNodeFiles.map(({ path, markdown }) => parseNodeDocument(path, markdown));
+  }
+
+  return [];
+}
+
+async function readRuntimeNodeFiles(): Promise<RuntimeNodeFile[] | null> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<RuntimeNodeFile[]>("read_node_files");
+  } catch {
+    return null;
+  }
+}
+
 function parseNodeDocument(path: string, markdown: string): NodeDocument {
-  const slug = path.split("/").pop()?.replace(/\.md$/, "") ?? "node";
+  const slug = path.split(/[\\/]/).pop()?.replace(/\.md$/, "") ?? "node";
   const title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() || titleFromSlug(slug);
   const links = [...markdown.matchAll(LINK_PATTERN)].map((match) => match[1].trim()).filter(Boolean);
 

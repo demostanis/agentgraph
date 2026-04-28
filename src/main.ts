@@ -8,4 +8,4 @@ if (!app) {
   throw new Error("App root was not found.");
 }
 
-mountApp(app);
+void mountApp(app);

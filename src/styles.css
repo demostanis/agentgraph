@@ -313,7 +313,7 @@ body {
   height: 100%;
   margin-left: auto;
   overflow: auto;
-  padding: 24px 28px 18px 48px;
+  padding: 24px 28px 76px 48px;
   border-left: 1px solid rgba(255, 255, 255, 0.18);
   scrollbar-gutter: stable;
   transition: max-width 360ms ease, margin 360ms ease, padding 360ms ease, border-color 260ms ease;
@@ -322,9 +322,135 @@ body {
 .node-panel.is-expanded .node-panel__inner {
   max-width: 920px;
   margin-right: auto;
-  padding: clamp(24px, 4vw, 44px) clamp(28px, 4vw, 56px);
+  padding: clamp(24px, 4vw, 44px) clamp(28px, 4vw, 56px) 96px;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(90deg, rgba(4, 6, 18, 0.3), rgba(4, 6, 18, 0.16));
+}
+
+.node-delete-button {
+  position: absolute;
+  right: var(--panel-x-padding);
+  bottom: clamp(24px, 3vw, 40px);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(248, 113, 113, 0.34);
+  border-radius: 999px;
+  appearance: none;
+  background: rgba(127, 29, 29, 0.2);
+  color: #f87171;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.node-delete-button:hover,
+.node-delete-button:focus-visible {
+  border-color: rgba(248, 113, 113, 0.72);
+  background: rgba(185, 28, 28, 0.34);
+  color: #fecaca;
+  outline: none;
+  transform: scale(1.04);
+}
+
+.node-delete-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+}
+
+.node-delete-button svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+}
+
+.node-panel.is-expanded .node-delete-button {
+  right: clamp(30px, 8vw, 112px);
+}
+
+.node-delete-confirm {
+  position: absolute;
+  right: var(--panel-x-padding);
+  bottom: calc(clamp(24px, 3vw, 40px) + 52px);
+  z-index: 5;
+  width: min(300px, calc(100% - var(--panel-x-padding) * 2));
+  padding: 18px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(248, 113, 113, 0.16), transparent 42%),
+    rgba(5, 7, 19, 0.86);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.44), 0 0 36px rgba(248, 113, 113, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.98);
+  transform-origin: bottom right;
+  backdrop-filter: blur(18px) saturate(1.08);
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+
+.node-delete-confirm.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.node-delete-confirm p {
+  margin: 0 0 6px;
+  color: #fecaca;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.node-delete-confirm strong {
+  display: block;
+  margin-bottom: 16px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.node-delete-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.node-delete-confirm__actions button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.node-delete-confirm__actions button:hover,
+.node-delete-confirm__actions button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.36);
+  outline: none;
+}
+
+#node-delete-confirm-button {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(185, 28, 28, 0.34);
+  color: #fecaca;
+}
+
+.node-panel.is-expanded .node-delete-confirm {
+  right: clamp(30px, 8vw, 112px);
 }
 
 .node-panel__eyebrow {
@@ -616,14 +742,27 @@ body {
 
   .node-panel__inner {
     max-height: 100%;
-    padding: 18px 0 0;
+    padding: 18px 0 72px;
     border-top: 1px solid rgba(255, 255, 255, 0.18);
     border-left: 0;
   }
 
   .node-panel.is-expanded .node-panel__inner {
-    padding: 20px;
+    padding: 20px 20px 84px;
     border-right: 0;
+  }
+
+  .node-delete-button,
+  .node-panel.is-expanded .node-delete-button {
+    right: 20px;
+    bottom: 20px;
+  }
+
+  .node-delete-confirm,
+  .node-panel.is-expanded .node-delete-confirm {
+    right: 20px;
+    bottom: 68px;
+    width: min(300px, calc(100% - 40px));
   }
 }
 
@@ -632,7 +771,8 @@ body {
   .node-panel,
   .node-panel__inner,
   .node-panel__toggle,
-  .node-panel__toggle-icon {
+  .node-panel__toggle-icon,
+  .node-delete-confirm {
     transition: none;
   }
 }

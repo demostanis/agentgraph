@@ -5,26 +5,41 @@ type HighlightJs = typeof import("highlight.js/lib/core").default;
 type Mermaid = typeof import("mermaid").default;
 
 type NodePanelCallbacks = {
+  onNodeDelete?: (node: GraphNode) => void;
   onNodeLinkClick?: (title: string) => void;
 };
 
 export class NodePanel {
   private renderId = 0;
+  private selectedNode: GraphNode | null = null;
 
   constructor(
     private readonly panel: HTMLElement,
     private readonly toggleButton: HTMLButtonElement,
+    private readonly deleteButton: HTMLButtonElement,
+    private readonly deleteConfirm: HTMLDivElement,
+    private readonly deleteConfirmTitle: HTMLSpanElement,
+    private readonly deleteCancelButton: HTMLButtonElement,
+    private readonly deleteConfirmButton: HTMLButtonElement,
     private readonly content: HTMLDivElement,
     private readonly backButton: HTMLButtonElement,
     private readonly callbacks: NodePanelCallbacks = {},
   ) {
     this.content.addEventListener("click", this.handleContentClick);
+    this.deleteButton.addEventListener("click", this.handleDeleteClick);
+    this.deleteCancelButton.addEventListener("click", this.hideDeleteConfirm);
+    this.deleteConfirmButton.addEventListener("click", this.confirmDelete);
     this.toggleButton.addEventListener("click", this.toggleExpanded);
+    document.addEventListener("keydown", this.handleKeyDown);
   }
 
-  show(node: GraphNode, linkCount: number): void {
+  show(node: GraphNode, linkCount: number, backlinkNodes: GraphNode[] = []): void {
     this.renderId += 1;
-    this.content.innerHTML = renderMarkdown(createNodeMarkdown(node));
+    this.selectedNode = node;
+    this.hideDeleteConfirm();
+    this.deleteButton.disabled = false;
+    this.deleteButton.setAttribute("aria-label", `Delete ${node.label}`);
+    this.content.innerHTML = renderMarkdown(createNodeMarkdown(node, backlinkNodes));
     this.panel.classList.add("is-visible");
     this.backButton.classList.add("is-visible");
     void this.highlightCodeBlocks(this.renderId);
@@ -33,6 +48,10 @@ export class NodePanel {
 
   hide(): void {
     this.renderId += 1;
+    this.selectedNode = null;
+    this.hideDeleteConfirm();
+    this.deleteButton.disabled = true;
+    this.deleteButton.setAttribute("aria-label", "Delete selected node");
     this.setExpanded(false);
     this.panel.classList.remove("is-visible");
     this.backButton.classList.remove("is-visible");
@@ -40,8 +59,52 @@ export class NodePanel {
 
   dispose(): void {
     this.content.removeEventListener("click", this.handleContentClick);
+    this.deleteButton.removeEventListener("click", this.handleDeleteClick);
+    this.deleteCancelButton.removeEventListener("click", this.hideDeleteConfirm);
+    this.deleteConfirmButton.removeEventListener("click", this.confirmDelete);
     this.toggleButton.removeEventListener("click", this.toggleExpanded);
+    document.removeEventListener("keydown", this.handleKeyDown);
   }
+
+  private handleDeleteClick = (): void => {
+    if (!this.selectedNode) {
+      return;
+    }
+
+    this.showDeleteConfirm();
+  };
+
+  private showDeleteConfirm(): void {
+    if (!this.selectedNode) {
+      return;
+    }
+
+    this.deleteConfirmTitle.textContent = this.selectedNode.label;
+    this.deleteConfirm.classList.add("is-visible");
+    this.deleteConfirm.setAttribute("aria-hidden", "false");
+    this.deleteConfirmButton.focus();
+  }
+
+  private hideDeleteConfirm = (): void => {
+    this.deleteConfirm.classList.remove("is-visible");
+    this.deleteConfirm.setAttribute("aria-hidden", "true");
+  };
+
+  private confirmDelete = (): void => {
+    if (!this.selectedNode) {
+      return;
+    }
+
+    this.hideDeleteConfirm();
+    this.callbacks.onNodeDelete?.(this.selectedNode);
+  };
+
+  private handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && this.deleteConfirm.classList.contains("is-visible")) {
+      this.hideDeleteConfirm();
+      this.deleteButton.focus();
+    }
+  };
 
   private toggleExpanded = (): void => {
     this.setExpanded(!this.panel.classList.contains("is-expanded"));
@@ -169,6 +232,18 @@ function loadMermaid(): Promise<Mermaid> {
   return mermaidLoader;
 }
 
-function createNodeMarkdown(node: GraphNode): string {
-  return node.markdown.trim();
+function createNodeMarkdown(node: GraphNode, backlinkNodes: GraphNode[]): string {
+  const backlinks = backlinkNodes.map((backlinkNode) => `- [[${backlinkNode.label}]]`).join("\n");
+
+  if (!backlinks) {
+    return node.markdown.trim();
+  }
+
+  return `
+${node.markdown.trim()}
+
+## Referenced by
+
+${backlinks}
+`.trim();
 }
