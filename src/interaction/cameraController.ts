@@ -64,6 +64,39 @@ export class CameraController {
     this.targetPosition.set(node.renderX + offset.x, node.renderY + offset.y);
   }
 
+  fitNodes(nodes: GraphNode[]): void {
+    if (nodes.length === 0) {
+      this.resetView();
+      return;
+    }
+
+    const width = Math.max(this.container.clientWidth, 1);
+    const height = Math.max(this.container.clientHeight, 1);
+    const padding = Math.min(Math.max(Math.min(width, height) * 0.16, 96), 220);
+    const bounds = nodes.reduce(
+      (box, node) => {
+        const radius = Math.max(node.radius, 18);
+        const x = node.renderX ?? node.x ?? 0;
+        const y = node.renderY ?? node.y ?? 0;
+
+        box.minX = Math.min(box.minX, x - radius);
+        box.maxX = Math.max(box.maxX, x + radius);
+        box.minY = Math.min(box.minY, y - radius);
+        box.maxY = Math.max(box.maxY, y + radius);
+        return box;
+      },
+      { minX: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY, minY: Number.POSITIVE_INFINITY, maxY: Number.NEGATIVE_INFINITY },
+    );
+    const graphWidth = Math.max(bounds.maxX - bounds.minX, 120);
+    const graphHeight = Math.max(bounds.maxY - bounds.minY, 120);
+    const availableWidth = Math.max(width - padding * 2, width * 0.32);
+    const availableHeight = Math.max(height - padding * 2, height * 0.32);
+    const fitZoom = Math.min(availableWidth / graphWidth, availableHeight / graphHeight);
+
+    this.targetPosition.set((bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2);
+    this.targetZoom = THREE.MathUtils.clamp(fitZoom, CAMERA_CONFIG.minZoom, CAMERA_CONFIG.maxZoom);
+  }
+
   panByWorldDelta(deltaX: number, deltaY: number): void {
     this.camera.position.x += deltaX;
     this.camera.position.y += deltaY;

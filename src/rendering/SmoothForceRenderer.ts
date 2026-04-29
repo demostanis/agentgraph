@@ -99,6 +99,7 @@ export class SmoothForceRenderer {
   private pointerDownNodeIndex = -1;
   private pointerDownWasBackground = false;
   private pointerDownWasFarFromNodes = false;
+  private graphAutoFollow = true;
   private selectedIndex = -1;
   private selectionAutoFollow = false;
   private hoveredIndex = -1;
@@ -255,7 +256,20 @@ export class SmoothForceRenderer {
   }
 
   resetView(immediate = false): void {
+    this.graphAutoFollow = false;
     this.cameraController.resetView(immediate);
+  }
+
+  fitVisibleNodes(): void {
+    if (this.selectedIndex !== -1) {
+      this.selectionAutoFollow = true;
+      this.graphAutoFollow = false;
+      this.updateSelectedCameraTarget();
+      return;
+    }
+
+    this.graphAutoFollow = true;
+    this.cameraController.fitNodes(this.nodes);
   }
 
   selectNodeByTitle(title: string): void {
@@ -340,6 +354,7 @@ export class SmoothForceRenderer {
     this.highlightLinkGeometry.setDrawRange(0, 0);
     this.simulation.alpha(Math.max(this.simulation.alpha(), 0.72));
     this.updateMeshes(1 / 60);
+    this.updateGraphCameraTarget();
     this.setInteractionClasses();
   }
 
@@ -347,7 +362,8 @@ export class SmoothForceRenderer {
     this.selectedIndex = -1;
     this.hoveredIndex = -1;
     this.selectionAutoFollow = false;
-    this.resetView();
+    this.graphAutoFollow = true;
+    this.cameraController.fitNodes(this.nodes);
     this.callbacks.onSelectionClear?.();
     this.setInteractionClasses();
   };
@@ -481,6 +497,7 @@ export class SmoothForceRenderer {
     }
 
     this.updateSelectedCameraTarget();
+    this.updateGraphCameraTarget();
     this.cameraController.update(delta);
     if (isWheelZooming && !this.draggedNode) {
       this.updateCameraOnlyVisuals();
@@ -764,6 +781,14 @@ export class SmoothForceRenderer {
     this.cameraController.followNode(node);
   }
 
+  private updateGraphCameraTarget(): void {
+    if (!this.graphAutoFollow || this.selectedIndex !== -1) {
+      return;
+    }
+
+    this.cameraController.fitNodes(this.nodes);
+  }
+
   private handlePointerDown = (event: PointerEvent): void => {
     if (event.button !== 0) {
       return;
@@ -796,6 +821,7 @@ export class SmoothForceRenderer {
 
     const world = this.getWorldAtPointer(event);
     this.panAnchor.copy(world);
+    this.graphAutoFollow = false;
     if (this.selectedIndex !== -1) {
       this.selectionAutoFollow = false;
     }
@@ -882,6 +908,7 @@ export class SmoothForceRenderer {
 
   private handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
+    this.graphAutoFollow = false;
     if (this.selectedIndex !== -1) {
       this.selectionAutoFollow = false;
     }
@@ -945,6 +972,7 @@ export class SmoothForceRenderer {
     this.selectedIndex = index;
     this.hoveredIndex = index;
     this.selectionAutoFollow = true;
+    this.graphAutoFollow = false;
     this.cameraController.setSelectedZoom();
     this.callbacks.onNodeSelect?.(node, this.linkedLinksByNode[index].size);
     this.updateSelectedCameraTarget();

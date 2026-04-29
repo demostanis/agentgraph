@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 import { CLUSTERS, NODE_COLOR_HEX } from "../config/graphConfig";
-import type { Graph, GraphLink, GraphNode, NodeDocument } from "../types";
+import type { Graph, GraphLink, GraphNode, NodeDocument, NodeSearchResult } from "../types";
 import { mulberry32 } from "../utils/random";
 
 const LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
@@ -10,6 +10,7 @@ const NODES_CHANGED_EVENT = "nodes://changed";
 type RuntimeNodeFile = {
   path: string;
   markdown: string;
+  modifiedTimeMs?: number;
 };
 
 export async function loadNodeGraph(): Promise<Graph> {
@@ -23,6 +24,11 @@ export async function watchNodeGraph(onChange: () => void): Promise<() => void> 
   } catch {
     return () => undefined;
   }
+}
+
+export async function searchNodes(query: string): Promise<NodeSearchResult[]> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<NodeSearchResult[]>("search_nodes", { query });
 }
 
 function createGraph(documents: NodeDocument[]): Graph {
@@ -43,6 +49,7 @@ function createGraph(documents: NodeDocument[]): Graph {
       id: document.slug,
       label: document.title,
       markdown: document.markdown,
+      timeMs: document.timeMs,
       outboundLinks: document.links,
       group,
       radius: 9 + Math.min(8, document.markdown.length / 180),
@@ -86,7 +93,7 @@ async function loadNodeDocuments(): Promise<NodeDocument[]> {
   const runtimeNodeFiles = await readRuntimeNodeFiles();
 
   if (runtimeNodeFiles) {
-    return runtimeNodeFiles.map(({ path, markdown }) => parseNodeDocument(path, markdown));
+    return runtimeNodeFiles.map(({ path, markdown, modifiedTimeMs }) => parseNodeDocument(path, markdown, modifiedTimeMs));
   }
 
   return [];
@@ -101,12 +108,13 @@ async function readRuntimeNodeFiles(): Promise<RuntimeNodeFile[] | null> {
   }
 }
 
-function parseNodeDocument(path: string, markdown: string): NodeDocument {
+function parseNodeDocument(path: string, markdown: string, modifiedTimeMs?: number): NodeDocument {
   const slug = path.split(/[\\/]/).pop()?.replace(/\.md$/, "") ?? "node";
   const title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() || titleFromSlug(slug);
   const links = [...markdown.matchAll(LINK_PATTERN)].map((match) => match[1].trim()).filter(Boolean);
+  const timeMs = modifiedTimeMs ?? Date.now();
 
-  return { slug, title, markdown: markdown.trim(), links };
+  return { slug, title, markdown: markdown.trim(), timeMs, links };
 }
 
 function normalizeTitle(title: string): string {

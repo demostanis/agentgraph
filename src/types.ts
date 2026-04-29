@@ -13,6 +13,7 @@ export interface GraphNode extends SimulationNodeDatum {
   id: string;
   label: string;
   markdown: string;
+  timeMs: number;
   outboundLinks: string[];
   group: number;
   radius: number;
@@ -38,5 +39,14 @@ export type NodeDocument = {
   slug: string;
   title: string;
   markdown: string;
+  timeMs: number;
   links: string[];
+};
+
+export type NodeSearchResult = {
+  id: string;
+  title: string;
+  excerpt: string;
+  matchLine: number;
+  matchKind: "title" | "content";
 };

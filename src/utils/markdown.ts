@@ -73,9 +73,24 @@ export function renderMarkdown(markdown: string): string {
 }
 
 function formatInline(value: string): string {
+  const segments: string[] = [];
+  const codeSpanPattern = /`([^`]+)`/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = codeSpanPattern.exec(value)) !== null) {
+    segments.push(formatInlineText(value.slice(cursor, match.index)));
+    segments.push(`<code>${escapeHtml(match[1])}</code>`);
+    cursor = match.index + match[0].length;
+  }
+
+  segments.push(formatInlineText(value.slice(cursor)));
+  return segments.join("");
+}
+
+function formatInlineText(value: string): string {
   return escapeHtml(value)
     .replace(/\[\[([^\]]+)\]\]/g, (_match, title: string) => `<a href="#" data-node-link="${title}">${title}</a>`)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/_([^_]+)_/g, "<em>$1</em>");
 }
