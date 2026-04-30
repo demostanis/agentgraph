@@ -210,6 +210,11 @@ body {
   text-shadow: 0 0 12px rgba(168, 85, 247, 0.9), 0 0 28px rgba(168, 85, 247, 0.42);
 }
 
+.node-label.is-visible {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 .node-label.is-linked {
   color: rgba(255, 255, 255, 0.9);
 }

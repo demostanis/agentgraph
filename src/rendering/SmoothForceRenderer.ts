@@ -11,6 +11,7 @@ import { createTopology } from "./topology";
 const ACCENT_COLOR = new THREE.Color(ACCENT_COLOR_HEX);
 const BACKGROUND_CLICK_DISTANCE = 6;
 const BACKGROUND_CLEAR_NODE_PADDING = 56;
+const LABEL_HOVER_BRIDGE_PADDING = 10;
 const DEFAULT_NODE_CAPACITY = 4096;
 const DEFAULT_LINK_CAPACITY = 16384;
 
@@ -308,7 +309,7 @@ export class SmoothForceRenderer {
 
     this.nodeLabels.forEach((label) => {
       if (!nodes.some((node) => labelsById.get(node.id) === label)) {
-        label.remove();
+        this.removeNodeLabel(label);
       }
     });
     this.nodeLabels.length = 0;
@@ -316,7 +317,7 @@ export class SmoothForceRenderer {
       const label = labelsById.get(node.id) ?? this.createNodeLabel(node);
       label.textContent = node.label;
       label.style.opacity = "0";
-      label.classList.remove("is-active", "is-linked");
+      label.classList.remove("is-active", "is-linked", "is-visible");
       this.nodeLabels.push(label);
     });
 
@@ -380,7 +381,7 @@ export class SmoothForceRenderer {
     this.inputController.dispose();
     window.removeEventListener("visibilitychange", this.handleVisibilityChange);
     this.container.classList.remove("is-hovering", "is-dragging-node", "is-panning", "has-selection");
-    this.nodeLabels.forEach((label) => label.remove());
+    this.nodeLabels.forEach((label) => this.removeNodeLabel(label));
     this.disposeScene();
     this.webgl.domElement.remove();
     this.webgl.dispose();
@@ -400,8 +401,20 @@ export class SmoothForceRenderer {
     const label = document.createElement("span");
     label.className = "node-label";
     label.textContent = node.label;
+    label.addEventListener("pointerenter", this.handleLabelPointerEnter);
+    label.addEventListener("pointerleave", this.handleLabelPointerLeave);
+    label.addEventListener("pointermove", this.stopLabelPointerEvent);
+    label.addEventListener("pointerdown", this.stopLabelPointerEvent);
     this.container.appendChild(label);
     return label;
+  }
+
+  private removeNodeLabel(label: HTMLSpanElement): void {
+    label.removeEventListener("pointerenter", this.handleLabelPointerEnter);
+    label.removeEventListener("pointerleave", this.handleLabelPointerLeave);
+    label.removeEventListener("pointermove", this.stopLabelPointerEvent);
+    label.removeEventListener("pointerdown", this.stopLabelPointerEvent);
+    label.remove();
   }
 
   private copyNodeLayout(source: GraphNode, target: GraphNode): void {
@@ -729,6 +742,7 @@ export class SmoothForceRenderer {
     }
 
     this.labelVisible[index] = true;
+    label.classList.add("is-visible");
   }
 
   private hideVisibleLabels(): void {
@@ -746,7 +760,7 @@ export class SmoothForceRenderer {
 
     const label = this.nodeLabels[index];
     label.style.opacity = "0";
-    label.classList.remove("is-active", "is-linked");
+    label.classList.remove("is-active", "is-linked", "is-visible");
     this.labelVisible[index] = false;
     this.labelActive[index] = false;
     this.labelLinked[index] = false;
@@ -858,7 +872,7 @@ export class SmoothForceRenderer {
       return;
     }
 
-    const hitIndex = this.getNodeAtPointer(event);
+    const hitIndex = this.getHoverIndexAtPointer(event);
     this.hoveredIndex = hitIndex;
 
     this.setInteractionClasses();
@@ -906,6 +920,35 @@ export class SmoothForceRenderer {
     this.setInteractionClasses();
   };
 
+  private handleLabelPointerEnter = (event: PointerEvent): void => {
+    if (this.selectedIndex !== -1 || this.interactionMode !== "idle") {
+      return;
+    }
+
+    const label = event.currentTarget as HTMLSpanElement;
+    const index = this.nodeLabels.indexOf(label);
+
+    if (index === -1 || !this.labelVisible[index]) {
+      return;
+    }
+
+    this.hoveredIndex = index;
+    this.setInteractionClasses();
+  };
+
+  private handleLabelPointerLeave = (): void => {
+    if (this.selectedIndex !== -1 || this.interactionMode !== "idle") {
+      return;
+    }
+
+    this.hoveredIndex = -1;
+    this.setInteractionClasses();
+  };
+
+  private stopLabelPointerEvent = (event: PointerEvent): void => {
+    event.stopPropagation();
+  };
+
   private handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
     this.graphAutoFollow = false;
@@ -925,6 +968,49 @@ export class SmoothForceRenderer {
 
     const hit = this.raycaster.intersectObject(this.nodeMesh, false)[0];
     return hit?.instanceId ?? -1;
+  }
+
+  private getHoverIndexAtPointer(event: PointerEvent): number {
+    const nodeIndex = this.getNodeAtPointer(event);
+
+    if (nodeIndex !== -1) {
+      return nodeIndex;
+    }
+
+    return this.getLabelBridgeAtPointer(event);
+  }
+
+  private getLabelBridgeAtPointer(event: PointerEvent): number {
+    const screenX = event.clientX - this.viewportLeft;
+    const screenY = event.clientY - this.viewportTop;
+
+    for (let index = 0; index < this.nodes.length; index += 1) {
+      if (!this.labelVisible[index]) {
+        continue;
+      }
+
+      const node = this.nodes[index];
+      const position = this.labelProjection.set(node.renderX, node.renderY, 0.32).project(this.camera);
+
+      if (position.x < -1.12 || position.x > 1.12 || position.y < -1.12 || position.y > 1.12) {
+        continue;
+      }
+
+      const labelRect = this.nodeLabels[index].getBoundingClientRect();
+      const nodeScreenX = (position.x * 0.5 + 0.5) * this.viewportWidth;
+      const nodeScreenY = (-position.y * 0.5 + 0.5) * this.viewportHeight;
+      const nodeRadiusPx = node.radius * this.camera.zoom;
+      const bridgeLeft = Math.min(labelRect.left - this.viewportLeft, nodeScreenX - nodeRadiusPx) - LABEL_HOVER_BRIDGE_PADDING;
+      const bridgeRight = Math.max(labelRect.right - this.viewportLeft, nodeScreenX + nodeRadiusPx) + LABEL_HOVER_BRIDGE_PADDING;
+      const bridgeTop = nodeScreenY - LABEL_HOVER_BRIDGE_PADDING;
+      const bridgeBottom = labelRect.top - this.viewportTop + LABEL_HOVER_BRIDGE_PADDING;
+
+      if (screenX >= bridgeLeft && screenX <= bridgeRight && screenY >= bridgeTop && screenY <= bridgeBottom) {
+        return index;
+      }
+    }
+
+    return -1;
   }
 
   private isPointerFarFromNodes(event: PointerEvent): boolean {
