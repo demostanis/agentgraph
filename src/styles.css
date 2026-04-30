@@ -350,6 +350,10 @@ body {
   z-index: 1;
 }
 
+.time-filter.is-current-thumb-active .time-filter__range--current {
+  z-index: 3;
+}
+
 .time-filter.is-span-mode .time-filter__range--span {
   opacity: 1;
   pointer-events: none;

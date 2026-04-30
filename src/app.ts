@@ -35,6 +35,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   let refreshTimeout = 0;
   let searchTimeout = 0;
   let activeSearchToken = 0;
+  let activeTimeSlider: "current" | "span" = "current";
   const timeFilterState: TimeFilterState = { mode: "span", buckets: [], currentBucketIndex: 0, spanStartBucketIndex: 0, currentPosition: 0, spanStartPosition: 0 };
   const deleteNode = async (nodeId: string): Promise<void> => {
     const { invoke } = await import("@tauri-apps/api/core");
@@ -84,6 +85,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     elements.timeFilter.classList.toggle("is-disabled", isDisabled);
     elements.timeFilter.classList.toggle("is-span-mode", timeFilterState.mode === "span");
     elements.timeFilter.classList.toggle("is-expanded", isTimeFilterExpanded);
+    elements.timeFilter.classList.toggle("is-current-thumb-active", activeTimeSlider === "current" || timeFilterState.currentPosition === 0);
     elements.timeFilterToggle.setAttribute("aria-expanded", String(isTimeFilterExpanded));
     elements.timeFilterToggle.setAttribute("aria-label", isTimeFilterExpanded ? "Hide time slider" : "Show time slider");
     elements.timeFilter.setAttribute("aria-label", `Filter nodes by ${timeFilterState.mode === "span" ? "time span" : "fixed day-hour"}; double click to toggle mode`);
@@ -177,6 +179,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     }
 
     if (event.currentTarget === elements.timeFilterSpan) {
+      activeTimeSlider = "span";
       timeFilterState.spanStartPosition = clampPosition(Number(elements.timeFilterSpan.value), 0, timeFilterState.currentPosition);
       timeFilterState.spanStartBucketIndex = clampIndex(timeFilterState.spanStartPosition, timeFilterState.buckets.length);
 
@@ -185,16 +188,31 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
         timeFilterState.spanStartPosition = timeFilterState.currentPosition;
       }
     } else {
-      timeFilterState.currentPosition = clampPosition(Number(elements.timeFilterCurrent.value), 0, timeFilterState.buckets.length - 1);
+      activeTimeSlider = "current";
+      const minCurrentPosition = timeFilterState.mode === "span" ? timeFilterState.spanStartPosition : 0;
+      timeFilterState.currentPosition = clampPosition(Number(elements.timeFilterCurrent.value), minCurrentPosition, timeFilterState.buckets.length - 1);
       timeFilterState.currentBucketIndex = clampIndex(timeFilterState.currentPosition, timeFilterState.buckets.length);
 
-      if (timeFilterState.spanStartBucketIndex > timeFilterState.currentBucketIndex) {
+      if (timeFilterState.mode === "span" && (timeFilterState.currentPosition < timeFilterState.spanStartPosition || timeFilterState.currentBucketIndex < timeFilterState.spanStartBucketIndex)) {
+        timeFilterState.currentBucketIndex = timeFilterState.spanStartBucketIndex;
+        timeFilterState.currentPosition = timeFilterState.spanStartPosition;
+      } else if (timeFilterState.spanStartBucketIndex > timeFilterState.currentBucketIndex) {
         timeFilterState.spanStartBucketIndex = timeFilterState.currentBucketIndex;
         timeFilterState.spanStartPosition = timeFilterState.currentPosition;
       }
     }
 
     applyTimeFilter();
+  };
+
+  const activateCurrentTimeSlider = (): void => {
+    activeTimeSlider = "current";
+    renderTimeControls();
+  };
+
+  const activateSpanTimeSlider = (): void => {
+    activeTimeSlider = "span";
+    renderTimeControls();
   };
 
   const timeModeToggleHandler = (event: MouseEvent): void => {
@@ -352,7 +370,11 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   const unlistenNodeChanges = await watchNodeGraph(scheduleGraphRefresh);
 
   elements.backButton.addEventListener("click", backClickHandler);
+  elements.timeFilterCurrent.addEventListener("focus", activateCurrentTimeSlider);
+  elements.timeFilterCurrent.addEventListener("pointerdown", activateCurrentTimeSlider);
   elements.timeFilterCurrent.addEventListener("input", timeInputHandler);
+  elements.timeFilterSpan.addEventListener("focus", activateSpanTimeSlider);
+  elements.timeFilterSpan.addEventListener("pointerdown", activateSpanTimeSlider);
   elements.timeFilterSpan.addEventListener("input", timeInputHandler);
   elements.timeFilter.addEventListener("dblclick", timeModeToggleHandler);
   elements.timeFilterToggle.addEventListener("click", timeFilterToggleHandler);
@@ -366,7 +388,11 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       window.clearTimeout(searchTimeout);
       unlistenNodeChanges();
       elements.backButton.removeEventListener("click", backClickHandler);
+      elements.timeFilterCurrent.removeEventListener("focus", activateCurrentTimeSlider);
+      elements.timeFilterCurrent.removeEventListener("pointerdown", activateCurrentTimeSlider);
       elements.timeFilterCurrent.removeEventListener("input", timeInputHandler);
+      elements.timeFilterSpan.removeEventListener("focus", activateSpanTimeSlider);
+      elements.timeFilterSpan.removeEventListener("pointerdown", activateSpanTimeSlider);
       elements.timeFilterSpan.removeEventListener("input", timeInputHandler);
       elements.timeFilter.removeEventListener("dblclick", timeModeToggleHandler);
       elements.timeFilterToggle.removeEventListener("click", timeFilterToggleHandler);
