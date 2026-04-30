@@ -3,6 +3,12 @@ import * as THREE from "three";
 import { CAMERA_CONFIG } from "../config/graphConfig";
 import type { GraphNode } from "../types";
 
+export type CameraViewport = {
+  x: number;
+  y: number;
+  zoom: number;
+};
+
 export class CameraController {
   private readonly targetPosition = new THREE.Vector2();
   private targetZoom = 1;
@@ -57,6 +63,15 @@ export class CameraController {
 
   setSelectedZoom(): void {
     this.targetZoom = THREE.MathUtils.clamp(CAMERA_CONFIG.selectedZoom, CAMERA_CONFIG.minZoom, CAMERA_CONFIG.maxZoom);
+  }
+
+  getTargetViewport(): CameraViewport {
+    return { x: this.targetPosition.x, y: this.targetPosition.y, zoom: this.targetZoom };
+  }
+
+  restoreViewport(viewport: CameraViewport): void {
+    this.targetPosition.set(viewport.x, viewport.y);
+    this.targetZoom = THREE.MathUtils.clamp(viewport.zoom, CAMERA_CONFIG.minZoom, CAMERA_CONFIG.maxZoom);
   }
 
   followNode(node: GraphNode): void {

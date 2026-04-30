@@ -2,7 +2,7 @@ import type { Simulation } from "d3-force";
 import * as THREE from "three";
 
 import { ACCENT_COLOR_HEX } from "../config/graphConfig";
-import { CameraController } from "../interaction/cameraController";
+import { CameraController, type CameraViewport } from "../interaction/cameraController";
 import { InputController } from "../interaction/inputController";
 import type { GraphLink, GraphNode, InteractionMode } from "../types";
 import { createGlowPointMaterial } from "./glowMaterial";
@@ -100,6 +100,7 @@ export class SmoothForceRenderer {
   private pointerDownNodeIndex = -1;
   private pointerDownWasBackground = false;
   private pointerDownWasFarFromNodes = false;
+  private preSelectionViewport: CameraViewport | null = null;
   private graphAutoFollow = true;
   private selectedIndex = -1;
   private selectionAutoFollow = false;
@@ -363,8 +364,13 @@ export class SmoothForceRenderer {
     this.selectedIndex = -1;
     this.hoveredIndex = -1;
     this.selectionAutoFollow = false;
-    this.graphAutoFollow = true;
-    this.cameraController.fitNodes(this.nodes);
+    this.graphAutoFollow = false;
+    if (this.preSelectionViewport) {
+      this.cameraController.restoreViewport(this.preSelectionViewport);
+      this.preSelectionViewport = null;
+    } else {
+      this.cameraController.fitNodes(this.nodes);
+    }
     this.callbacks.onSelectionClear?.();
     this.setInteractionClasses();
   };
@@ -1055,6 +1061,9 @@ export class SmoothForceRenderer {
 
   private selectNode(index: number): void {
     const node = this.nodes[index];
+    if (this.selectedIndex === -1) {
+      this.preSelectionViewport = this.cameraController.getTargetViewport();
+    }
     this.selectedIndex = index;
     this.hoveredIndex = index;
     this.selectionAutoFollow = true;
