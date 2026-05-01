@@ -416,6 +416,7 @@ export class SmoothForceRenderer {
     label.addEventListener("pointerleave", this.handleLabelPointerLeave);
     label.addEventListener("pointermove", this.stopLabelPointerEvent);
     label.addEventListener("pointerdown", this.stopLabelPointerEvent);
+    label.addEventListener("pointerup", this.handleLabelPointerUp);
     label.draggable = false;
     this.container.appendChild(label);
     return label;
@@ -434,6 +435,7 @@ export class SmoothForceRenderer {
     label.removeEventListener("pointerleave", this.handleLabelPointerLeave);
     label.removeEventListener("pointermove", this.stopLabelPointerEvent);
     label.removeEventListener("pointerdown", this.stopLabelPointerEvent);
+    label.removeEventListener("pointerup", this.handleLabelPointerUp);
     label.remove();
   }
 
@@ -895,6 +897,15 @@ export class SmoothForceRenderer {
       return;
     }
 
+    const bridgeIndex = this.getLabelBridgeAtPointer(event);
+
+    if (bridgeIndex !== -1) {
+      this.hoveredIndex = bridgeIndex;
+      this.pointerDownNodeIndex = bridgeIndex;
+      this.setInteractionClasses();
+      return;
+    }
+
     const world = this.getWorldAtPointer(event);
     this.panAnchor.copy(world);
     this.graphAutoFollow = false;
@@ -1005,6 +1016,24 @@ export class SmoothForceRenderer {
 
     this.hoveredIndex = -1;
     this.setInteractionClasses();
+  };
+
+  private handleLabelPointerUp = (event: PointerEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.button !== 0) {
+      return;
+    }
+
+    const label = event.currentTarget as HTMLSpanElement;
+    const index = this.nodeLabels.indexOf(label);
+
+    if (index === -1 || !this.labelVisible[index]) {
+      return;
+    }
+
+    this.selectNode(index, "pointer");
   };
 
   private stopLabelPointerEvent = (event: PointerEvent): void => {
