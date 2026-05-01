@@ -46,6 +46,8 @@ Always preserve the project identity when one can be inferred. Use the clearest 
 
 - Look for an explicit project name in the conversation first.
 - If none is explicit, infer it from the working directory name, repository name, package name, or remote URL.
+- Search for an existing main node for the project or workstream, such as the primary node about `Agentgraph`, and link new nodes to it when it exists.
+- If there is no main project node and the conversation establishes durable project-level context, create one and link the new nodes back to it.
 - If the branch name adds useful context, include it as the workstream or feature context, such as `Agentgraph Skill Updates` from an `agentgraph` repo on a `skill-node-granularity` branch.
 - The branch name can be specified in node content when it clarifies the workstream, feature, or reason the conversation happened.
 - Include the project name in the overview node description and in any generic titles or opening sentences where otherwise the node would be ambiguous.
@@ -201,7 +203,7 @@ The assistant created the nodes successfully, verified with linting, sent the re
 ## Script Workflow
 
 1. Identify the project name from the conversation, directory, repo, package, remote, or branch when available.
-2. Search before creating, to avoid duplicates and find stale behavior nodes that should be updated.
+2. Search before creating, to avoid duplicates, find the main project/workstream node to link to, and find stale behavior nodes that should be updated.
 3. Create or update nodes with the repository scripts rather than writing ad hoc files.
 4. When behavior changes, update the existing behavior node and create or update a linked rationale node that explains why.
 5. Run `check-node-links.sh` after changing linked nodes.
@@ -290,6 +292,7 @@ Before responding, check the graph against this list:
 
 - The overview node links to every major node.
 - The overview description names the project or workstream when one can be inferred.
+- New nodes link to the main project or workstream node when one exists or was created.
 - Every `[[Wiki Link]]` points to an existing node title.
 - Each node captures one durable idea, not a transcript slice.
 - A single feature remains a single node unless an architectural decision needs a separate node.
