@@ -209,7 +209,7 @@ body {
   max-width: min(220px, 34vw);
   padding: 4px 9px;
   border-radius: 12px;
-  background: rgba(4, 6, 18, 0.34);
+  background: rgba(4, 6, 18, 0.46);
   color: rgba(255, 255, 255, 0.86);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.68rem;
@@ -223,6 +223,8 @@ body {
   white-space: normal;
   opacity: 0;
   pointer-events: none;
+  -webkit-backdrop-filter: blur(12px) saturate(1.12);
+  backdrop-filter: blur(12px) saturate(1.12);
   transform-origin: top center;
   contain: layout paint style;
   will-change: transform, opacity;
