@@ -16,9 +16,11 @@ const DEFAULT_NODE_CAPACITY = 4096;
 const DEFAULT_LINK_CAPACITY = 16384;
 
 type SmoothForceRendererCallbacks = {
-  onNodeSelect?: (node: GraphNode, linkCount: number) => void;
+  onNodeSelect?: (node: GraphNode, linkCount: number, source: NodeSelectionSource) => void;
   onSelectionClear?: () => void;
 };
+
+type NodeSelectionSource = "pointer" | "programmatic" | "sync";
 
 type SmoothForceRendererOptions = {
   container: HTMLDivElement;
@@ -346,7 +348,7 @@ export class SmoothForceRenderer {
       this.callbacks.onSelectionClear?.();
     } else {
       const selectedNode = this.nodes[this.selectedIndex];
-      this.callbacks.onNodeSelect?.(selectedNode, this.linkedLinksByNode[this.selectedIndex].size);
+      this.callbacks.onNodeSelect?.(selectedNode, this.linkedLinksByNode[this.selectedIndex].size, "sync");
     }
 
     this.nodeMesh.count = this.nodes.length;
@@ -953,7 +955,7 @@ export class SmoothForceRenderer {
     }
 
     if (this.pointerDownNodeIndex !== -1 && clickDistance < BACKGROUND_CLICK_DISTANCE) {
-      this.selectNode(this.pointerDownNodeIndex);
+      this.selectNode(this.pointerDownNodeIndex, "pointer");
     } else if (
       this.pointerDownWasBackground &&
       this.pointerDownWasFarFromNodes &&
@@ -1124,7 +1126,7 @@ export class SmoothForceRenderer {
     this.pointer.y = -((event.clientY - this.viewportTop) / this.viewportHeight) * 2 + 1;
   }
 
-  private selectNode(index: number): void {
+  private selectNode(index: number, source: NodeSelectionSource = "programmatic"): void {
     const node = this.nodes[index];
     if (this.selectedIndex === -1) {
       this.preSelectionViewport = this.cameraController.getTargetViewport();
@@ -1134,7 +1136,7 @@ export class SmoothForceRenderer {
     this.selectionAutoFollow = true;
     this.graphAutoFollow = false;
     this.cameraController.setSelectedZoom();
-    this.callbacks.onNodeSelect?.(node, this.linkedLinksByNode[index].size);
+    this.callbacks.onNodeSelect?.(node, this.linkedLinksByNode[index].size, source);
     this.updateSelectedCameraTarget();
     this.setInteractionClasses();
   }

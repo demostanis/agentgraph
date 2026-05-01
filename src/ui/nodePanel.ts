@@ -7,6 +7,7 @@ type Mermaid = typeof import("mermaid").default;
 type NodePanelCallbacks = {
   onNodeDelete?: (node: GraphNode) => void;
   onNodeLinkClick?: (title: string) => void;
+  onNodeBack?: () => void;
 };
 
 export class NodePanel {
@@ -21,6 +22,7 @@ export class NodePanel {
     private readonly deleteConfirmTitle: HTMLSpanElement,
     private readonly deleteCancelButton: HTMLButtonElement,
     private readonly deleteConfirmButton: HTMLButtonElement,
+    private readonly panelBackButton: HTMLButtonElement,
     private readonly content: HTMLDivElement,
     private readonly backButton: HTMLButtonElement,
     private readonly callbacks: NodePanelCallbacks = {},
@@ -29,6 +31,7 @@ export class NodePanel {
     this.deleteButton.addEventListener("click", this.handleDeleteClick);
     this.deleteCancelButton.addEventListener("click", this.hideDeleteConfirm);
     this.deleteConfirmButton.addEventListener("click", this.confirmDelete);
+    this.panelBackButton.addEventListener("click", this.handlePanelBackClick);
     this.toggleButton.addEventListener("click", this.toggleExpanded);
     document.addEventListener("keydown", this.handleKeyDown);
   }
@@ -54,7 +57,14 @@ export class NodePanel {
     this.deleteButton.setAttribute("aria-label", "Delete selected node");
     this.setExpanded(false);
     this.panel.classList.remove("is-visible");
+    this.setCanGoBack(false);
     this.backButton.classList.remove("is-visible");
+  }
+
+  setCanGoBack(canGoBack: boolean): void {
+    this.panel.classList.toggle("has-node-history", canGoBack);
+    this.panelBackButton.disabled = !canGoBack;
+    this.panelBackButton.classList.toggle("is-visible", canGoBack);
   }
 
   dispose(): void {
@@ -62,6 +72,7 @@ export class NodePanel {
     this.deleteButton.removeEventListener("click", this.handleDeleteClick);
     this.deleteCancelButton.removeEventListener("click", this.hideDeleteConfirm);
     this.deleteConfirmButton.removeEventListener("click", this.confirmDelete);
+    this.panelBackButton.removeEventListener("click", this.handlePanelBackClick);
     this.toggleButton.removeEventListener("click", this.toggleExpanded);
     document.removeEventListener("keydown", this.handleKeyDown);
   }
@@ -97,6 +108,10 @@ export class NodePanel {
 
     this.hideDeleteConfirm();
     this.callbacks.onNodeDelete?.(this.selectedNode);
+  };
+
+  private handlePanelBackClick = (): void => {
+    this.callbacks.onNodeBack?.();
   };
 
   private handleKeyDown = (event: KeyboardEvent): void => {

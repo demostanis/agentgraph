@@ -36,6 +36,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   let searchTimeout = 0;
   let activeSearchToken = 0;
   let activeTimeSlider: "current" | "span" = "current";
+  const nodePanelHistory: string[] = [];
   const timeFilterState: TimeFilterState = { mode: "span", buckets: [], currentBucketIndex: 0, spanStartBucketIndex: 0, currentPosition: 0, spanStartPosition: 0 };
   const deleteNode = async (nodeId: string): Promise<void> => {
     const { invoke } = await import("@tauri-apps/api/core");
@@ -49,6 +50,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     elements.nodeDeleteConfirmTitle,
     elements.nodeDeleteCancel,
     elements.nodeDeleteConfirmButton,
+    elements.nodePanelBackButton,
     elements.nodeContent,
     elements.backButton,
     {
@@ -59,9 +61,14 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
         });
       },
       onNodeLinkClick: (title) => selectLinkedNode(title),
+      onNodeBack: () => navigateNodePanelBack(),
     },
   );
-  const backClickHandler = (): void => renderer?.clearSelection();
+  const backClickHandler = (): void => {
+    nodePanelHistory.length = 0;
+    nodePanel.setCanGoBack(false);
+    renderer?.clearSelection();
+  };
 
   const renderTimeControls = (): void => {
     const maxBucketIndex = Math.max(timeFilterState.buckets.length - 1, 0);
@@ -150,7 +157,12 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     timeFilterState.currentPosition = endBucketIndex;
   };
 
-  const selectNode = (targetNode: GraphNode): void => {
+  const selectNode = (targetNode: GraphNode, resetPanelHistory = false): void => {
+    if (resetPanelHistory) {
+      nodePanelHistory.length = 0;
+      nodePanel.setCanGoBack(false);
+    }
+
     if (!currentGraph.nodes.some((node) => node.id === targetNode.id)) {
       includeLinkedNodeInTimeSpan(targetNode);
       const graph = filteredGraph();
@@ -170,7 +182,31 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       return;
     }
 
+    if (selectedNodeId && selectedNodeId !== targetNode.id) {
+      nodePanelHistory.push(selectedNodeId);
+      nodePanel.setCanGoBack(true);
+    }
+
     selectNode(targetNode);
+  };
+
+  const navigateNodePanelBack = (): void => {
+    const previousNodeId = nodePanelHistory.pop();
+
+    if (!previousNodeId) {
+      nodePanel.setCanGoBack(false);
+      return;
+    }
+
+    const previousNode = fullGraph.nodes.find((node) => node.id === previousNodeId);
+
+    if (!previousNode) {
+      nodePanel.setCanGoBack(nodePanelHistory.length > 0);
+      return;
+    }
+
+    selectNode(previousNode);
+    nodePanel.setCanGoBack(nodePanelHistory.length > 0);
   };
 
   const timeInputHandler = (event: Event): void => {
@@ -315,7 +351,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     const targetNode = fullGraph.nodes.find((node) => node.id === resultButton.dataset.nodeId);
 
     if (targetNode) {
-      selectNode(targetNode);
+      selectNode(targetNode, true);
     }
   };
 
@@ -346,12 +382,18 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       links: graph.links,
       simulation,
       callbacks: {
-        onNodeSelect: (node, linkCount) => {
+        onNodeSelect: (node, linkCount, source) => {
+          if (source === "pointer") {
+            nodePanelHistory.length = 0;
+          }
+
           selectedNodeId = node.id;
           nodePanel.show(node, linkCount, getUnlinkedBacklinks(node, currentGraph.nodes));
+          nodePanel.setCanGoBack(nodePanelHistory.length > 0);
         },
         onSelectionClear: () => {
           selectedNodeId = null;
+          nodePanelHistory.length = 0;
           nodePanel.hide();
         },
       },

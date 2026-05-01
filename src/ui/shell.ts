@@ -19,6 +19,7 @@ export type ShellElements = {
   nodeDeleteConfirmTitle: HTMLSpanElement;
   nodeDeleteCancel: HTMLButtonElement;
   nodeDeleteConfirmButton: HTMLButtonElement;
+  nodePanelBackButton: HTMLButtonElement;
   nodeContent: HTMLDivElement;
 };
 
@@ -70,6 +71,13 @@ export function mountShell(app: HTMLDivElement): ShellElements {
             <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
           </svg>
         </button>
+        <button id="node-panel-back-button" class="node-panel__back" type="button" aria-label="Go back to previous node">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M12.5 4.5 7 10l5.5 5.5" />
+            <path d="M7.5 10H16" />
+          </svg>
+          <span>Back</span>
+        </button>
         <div class="node-panel__inner">
           <div id="node-content" class="node-content"></div>
         </div>
@@ -109,6 +117,7 @@ export function mountShell(app: HTMLDivElement): ShellElements {
   const nodeDeleteConfirmTitle = app.querySelector<HTMLSpanElement>("#node-delete-confirm-title");
   const nodeDeleteCancel = app.querySelector<HTMLButtonElement>("#node-delete-cancel");
   const nodeDeleteConfirmButton = app.querySelector<HTMLButtonElement>("#node-delete-confirm-button");
+  const nodePanelBackButton = app.querySelector<HTMLButtonElement>("#node-panel-back-button");
   const nodeContent = app.querySelector<HTMLDivElement>("#node-content");
 
   if (
@@ -131,6 +140,7 @@ export function mountShell(app: HTMLDivElement): ShellElements {
     !nodeDeleteConfirmTitle ||
     !nodeDeleteCancel ||
     !nodeDeleteConfirmButton ||
+    !nodePanelBackButton ||
     !nodeContent
   ) {
     throw new Error("Renderer UI could not be initialized.");
@@ -157,6 +167,7 @@ export function mountShell(app: HTMLDivElement): ShellElements {
     nodeDeleteConfirmTitle,
     nodeDeleteCancel,
     nodeDeleteConfirmButton,
+    nodePanelBackButton,
     nodeContent,
   };
 }
