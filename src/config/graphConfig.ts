@@ -20,6 +20,7 @@ export const CAMERA_CONFIG = {
   minZoom: 0.32,
   maxZoom: 4.5,
   selectedZoom: 1.45,
+  hoverPreviewZoom: 1.08,
   mobilePanelWidthRatio: 0.82,
   mobilePanelTopRatio: 0.35,
   minSafeZoom: 0.001,

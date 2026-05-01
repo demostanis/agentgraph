@@ -422,7 +422,10 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       return;
     }
 
-    renderer?.hoverNodeById(resultButton.dataset.nodeId ?? null);
+    const stageRect = elements.stage.getBoundingClientRect();
+    const resultsRect = elements.nodeSearchResults.getBoundingClientRect();
+    const previewY = Math.min(Math.max(resultsRect.bottom - stageRect.top + 150, stageRect.height * 0.58), Math.max(stageRect.height - 96, 96));
+    renderer?.hoverNodeById(resultButton.dataset.nodeId ?? null, true, { x: stageRect.width / 2, y: previewY });
   };
 
   const searchResultsPointerOutHandler = (event: PointerEvent): void => {

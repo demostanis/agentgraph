@@ -104,6 +104,7 @@ export class SmoothForceRenderer {
   private pointerDownWasBackground = false;
   private pointerDownWasFarFromNodes = false;
   private preSelectionViewport: CameraViewport | null = null;
+  private preSearchHoverViewport: CameraViewport | null = null;
   private graphAutoFollow = true;
   private selectedIndex = -1;
   private selectionAutoFollow = false;
@@ -287,12 +288,22 @@ export class SmoothForceRenderer {
     }
   }
 
-  hoverNodeById(nodeId: string | null): void {
+  hoverNodeById(nodeId: string | null, shouldPreviewCamera = false, previewScreenPosition?: { x: number; y: number }): void {
     if (this.selectedIndex !== -1 || this.interactionMode !== "idle") {
       return;
     }
 
     this.hoveredIndex = nodeId ? this.nodes.findIndex((node) => node.id === nodeId) : -1;
+
+    if (shouldPreviewCamera && this.hoveredIndex !== -1) {
+      this.preSearchHoverViewport ??= this.cameraController.getTargetViewport();
+      this.graphAutoFollow = false;
+      this.cameraController.previewNode(this.nodes[this.hoveredIndex], previewScreenPosition);
+    } else if (!nodeId && this.preSearchHoverViewport) {
+      this.cameraController.restoreViewport(this.preSearchHoverViewport);
+      this.preSearchHoverViewport = null;
+    }
+
     this.setInteractionClasses();
   }
 
@@ -1179,6 +1190,7 @@ export class SmoothForceRenderer {
 
   private selectNode(index: number, source: NodeSelectionSource = "programmatic"): void {
     const node = this.nodes[index];
+    this.preSearchHoverViewport = null;
     if (this.selectedIndex === -1) {
       this.preSelectionViewport = this.cameraController.getTargetViewport();
     }

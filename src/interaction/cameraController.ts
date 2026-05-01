@@ -65,6 +65,10 @@ export class CameraController {
     this.targetZoom = THREE.MathUtils.clamp(CAMERA_CONFIG.selectedZoom, CAMERA_CONFIG.minZoom, CAMERA_CONFIG.maxZoom);
   }
 
+  setHoverPreviewZoom(): void {
+    this.targetZoom = THREE.MathUtils.clamp(CAMERA_CONFIG.hoverPreviewZoom, CAMERA_CONFIG.minZoom, CAMERA_CONFIG.maxZoom);
+  }
+
   getTargetViewport(): CameraViewport {
     return { x: this.targetPosition.x, y: this.targetPosition.y, zoom: this.targetZoom };
   }
@@ -77,6 +81,22 @@ export class CameraController {
   followNode(node: GraphNode): void {
     const offset = this.getPanelCameraOffset(this.targetZoom);
     this.targetPosition.set(node.renderX + offset.x, node.renderY + offset.y);
+  }
+
+  previewNode(node: GraphNode, screenPosition?: { x: number; y: number }): void {
+    this.setHoverPreviewZoom();
+
+    if (screenPosition) {
+      const width = Math.max(this.container.clientWidth, 1);
+      const height = Math.max(this.container.clientHeight, 1);
+      this.targetPosition.set(
+        node.renderX - (screenPosition.x - width / 2) / this.targetZoom,
+        node.renderY + (screenPosition.y - height / 2) / this.targetZoom,
+      );
+      return;
+    }
+
+    this.targetPosition.set(node.renderX, node.renderY);
   }
 
   fitNodes(nodes: GraphNode[]): void {
