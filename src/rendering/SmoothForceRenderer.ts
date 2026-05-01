@@ -415,7 +415,7 @@ export class SmoothForceRenderer {
     label.addEventListener("pointerenter", this.handleLabelPointerEnter);
     label.addEventListener("pointerleave", this.handleLabelPointerLeave);
     label.addEventListener("pointermove", this.stopLabelPointerEvent);
-    label.addEventListener("pointerdown", this.stopLabelPointerEvent);
+    label.addEventListener("pointerdown", this.handleLabelPointerDown);
     label.addEventListener("pointerup", this.handleLabelPointerUp);
     label.draggable = false;
     this.container.appendChild(label);
@@ -434,7 +434,7 @@ export class SmoothForceRenderer {
     label.removeEventListener("pointerenter", this.handleLabelPointerEnter);
     label.removeEventListener("pointerleave", this.handleLabelPointerLeave);
     label.removeEventListener("pointermove", this.stopLabelPointerEvent);
-    label.removeEventListener("pointerdown", this.stopLabelPointerEvent);
+    label.removeEventListener("pointerdown", this.handleLabelPointerDown);
     label.removeEventListener("pointerup", this.handleLabelPointerUp);
     label.remove();
   }
@@ -880,29 +880,14 @@ export class SmoothForceRenderer {
     const hitIndex = this.getNodeAtPointer(event);
 
     if (hitIndex !== -1) {
-      const node = this.nodes[hitIndex];
-      const world = this.getWorldAtPointer(event);
-      this.draggedNode = node;
-      this.hoveredIndex = hitIndex;
-      this.pointerDownNodeIndex = hitIndex;
-      if (this.selectedIndex !== -1) {
-        this.selectionAutoFollow = false;
-      }
-      this.dragOffset.set((node.x ?? node.renderX) - world.x, (node.y ?? node.renderY) - world.y);
-      node.fx = node.x ?? node.renderX;
-      node.fy = node.y ?? node.renderY;
-      this.interactionMode = "drag-node";
-      this.simulation.alphaTarget(0.18).alpha(0.42);
-      this.setInteractionClasses();
+      this.startNodeDrag(hitIndex, event);
       return;
     }
 
     const bridgeIndex = this.getLabelBridgeAtPointer(event);
 
     if (bridgeIndex !== -1) {
-      this.hoveredIndex = bridgeIndex;
-      this.pointerDownNodeIndex = bridgeIndex;
-      this.setInteractionClasses();
+      this.startNodeDrag(bridgeIndex, event);
       return;
     }
 
@@ -918,6 +903,23 @@ export class SmoothForceRenderer {
     this.interactionMode = "pan-camera";
     this.setInteractionClasses();
   };
+
+  private startNodeDrag(index: number, event: PointerEvent): void {
+    const node = this.nodes[index];
+    const world = this.getWorldAtPointer(event);
+    this.draggedNode = node;
+    this.hoveredIndex = index;
+    this.pointerDownNodeIndex = index;
+    if (this.selectedIndex !== -1) {
+      this.selectionAutoFollow = false;
+    }
+    this.dragOffset.set((node.x ?? node.renderX) - world.x, (node.y ?? node.renderY) - world.y);
+    node.fx = node.x ?? node.renderX;
+    node.fy = node.y ?? node.renderY;
+    this.interactionMode = "drag-node";
+    this.simulation.alphaTarget(0.18).alpha(0.42);
+    this.setInteractionClasses();
+  }
 
   private handlePointerMove = (event: PointerEvent): void => {
     if (this.interactionMode === "drag-node" && this.draggedNode) {
@@ -1018,7 +1020,7 @@ export class SmoothForceRenderer {
     this.setInteractionClasses();
   };
 
-  private handleLabelPointerUp = (event: PointerEvent): void => {
+  private handleLabelPointerDown = (event: PointerEvent): void => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -1033,7 +1035,18 @@ export class SmoothForceRenderer {
       return;
     }
 
-    this.selectNode(index, "pointer");
+    this.clearNativeSelection();
+    this.container.setPointerCapture(event.pointerId);
+    this.pointerDownScreen.set(event.clientX, event.clientY);
+    this.pointerDownWasBackground = false;
+    this.pointerDownWasFarFromNodes = false;
+    this.startNodeDrag(index, event);
+  };
+
+  private handleLabelPointerUp = (event: PointerEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    this.handlePointerUp(event);
   };
 
   private stopLabelPointerEvent = (event: PointerEvent): void => {
