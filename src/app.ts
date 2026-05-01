@@ -170,6 +170,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
 
     renderer?.syncGraph(graph.nodes, graph.links, simulation);
     renderer?.fitVisibleNodes();
+    reorderSearchResultsForTimeFilter();
     renderTimeControls();
     renderSearchControls();
   };
@@ -317,12 +318,36 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     renderSearchControls();
   };
 
+  const sortSearchResultElements = (results: HTMLButtonElement[]): HTMLButtonElement[] => {
+    const currentNodeIds = new Set(currentGraph.nodes.map((node) => node.id));
+    return [...results].sort((a, b) => {
+      const aInFilter = currentNodeIds.has(a.dataset.nodeId ?? "");
+      const bInFilter = currentNodeIds.has(b.dataset.nodeId ?? "");
+
+      if (aInFilter !== bInFilter) {
+        return aInFilter ? -1 : 1;
+      }
+
+      return Number(a.dataset.searchRank ?? 0) - Number(b.dataset.searchRank ?? 0);
+    });
+  };
+
+  const reorderSearchResultsForTimeFilter = (): void => {
+    const results = Array.from(elements.nodeSearchResults.querySelectorAll<HTMLButtonElement>("button[data-node-id]"));
+
+    if (results.length === 0) {
+      return;
+    }
+
+    elements.nodeSearchResults.replaceChildren(...sortSearchResultElements(results));
+  };
+
   const renderSearchResults = (query: string, results: NodeSearchResult[]): void => {
     areSearchResultsVisible = true;
     elements.nodeSearch.classList.remove("is-loading", "has-error");
     elements.nodeSearch.classList.toggle("has-results", results.length > 0);
     elements.nodeSearchStatus.textContent = results.length === 0 ? `No matches for "${query}".` : `${results.length} search result${results.length === 1 ? "" : "s"}.`;
-    elements.nodeSearchResults.replaceChildren(...results.map(createSearchResultElement));
+    elements.nodeSearchResults.replaceChildren(...sortSearchResultElements(results.map((result, index) => createSearchResultElement(result, index))));
     renderSearchControls();
   };
 
@@ -731,11 +756,12 @@ function clampPosition(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function createSearchResultElement(result: NodeSearchResult): HTMLButtonElement {
+function createSearchResultElement(result: NodeSearchResult, searchRank = 0): HTMLButtonElement {
   const button = document.createElement("button");
   button.className = "node-search__result";
   button.type = "button";
   button.dataset.nodeId = result.id;
+  button.dataset.searchRank = String(searchRank);
   button.setAttribute("role", "option");
   button.setAttribute("aria-label", `Open ${result.title}`);
 
