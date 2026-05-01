@@ -23,6 +23,8 @@ type TimeBucket = {
   endTimeMs: number;
 };
 
+type TimeSpanInclusionMode = "selected-node" | "current-span";
+
 const CLUSTER_GAP_MS = 5 * 60 * 1000;
 
 export async function mountApp(app: HTMLDivElement): Promise<AppController> {
@@ -194,18 +196,42 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     timeFilterState.currentPosition = endBucketIndex;
   };
 
-  const selectNode = (targetNode: GraphNode, resetPanelHistory = false): void => {
+  const includeNodeInCurrentTimeSpan = (targetNode: GraphNode): void => {
+    const targetBucketIndex = findBucketIndexForTime(timeFilterState.buckets, targetNode.timeMs);
+
+    if (targetBucketIndex === -1) {
+      return;
+    }
+
+    const currentStartBucketIndex = timeFilterState.mode === "span" ? timeFilterState.spanStartBucketIndex : timeFilterState.currentBucketIndex;
+    const startBucketIndex = Math.min(currentStartBucketIndex, targetBucketIndex);
+    const endBucketIndex = Math.max(timeFilterState.currentBucketIndex, targetBucketIndex);
+
+    timeFilterState.mode = "span";
+    timeFilterState.spanStartBucketIndex = startBucketIndex;
+    timeFilterState.currentBucketIndex = endBucketIndex;
+    timeFilterState.spanStartPosition = startBucketIndex;
+    timeFilterState.currentPosition = endBucketIndex;
+  };
+
+  const selectNode = (targetNode: GraphNode, resetPanelHistory = false, timeSpanInclusionMode: TimeSpanInclusionMode = "selected-node"): void => {
     if (resetPanelHistory) {
       nodePanelHistory.length = 0;
       nodePanel.setCanGoBack(false);
     }
 
     if (!currentGraph.nodes.some((node) => node.id === targetNode.id)) {
-      includeLinkedNodeInTimeSpan(targetNode);
+      if (timeSpanInclusionMode === "current-span") {
+        includeNodeInCurrentTimeSpan(targetNode);
+      } else {
+        includeLinkedNodeInTimeSpan(targetNode);
+      }
+
       const graph = filteredGraph();
       currentGraph = graph;
       const simulation = createForceSimulation(graph.nodes, graph.links);
       renderer?.syncGraph(graph.nodes, graph.links, simulation);
+      reorderSearchResultsForTimeFilter();
       renderTimeControls();
     }
 
@@ -434,7 +460,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     const targetNode = fullGraph.nodes.find((node) => node.id === resultButton.dataset.nodeId);
 
     if (targetNode) {
-      selectNode(targetNode, true);
+      selectNode(targetNode, true, "current-span");
       areSearchResultsVisible = !areSearchResultsVisible;
       renderSearchControls();
     }
