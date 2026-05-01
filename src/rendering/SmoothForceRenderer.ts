@@ -700,7 +700,7 @@ export class SmoothForceRenderer {
     const linkedNodes = activeIndex !== -1 ? this.linkedNodesByNode[activeIndex] : null;
     const zoomShowsLabels = zoom >= 0.78;
 
-    if (!zoomShowsLabels) {
+    if (!zoomShowsLabels && activeIndex === -1) {
       this.hideVisibleLabels();
       return;
     }
@@ -708,7 +708,7 @@ export class SmoothForceRenderer {
     this.nodes.forEach((node, index) => {
       const isActive = index === activeIndex;
       const isLinked = linkedNodes?.has(index) ?? false;
-      const visible = zoomShowsLabels && (this.selectedIndex === -1 || isLinked);
+      const visible = isActive || (zoomShowsLabels && (this.selectedIndex === -1 || isLinked));
 
       if (!visible) {
         this.hideLabel(index);
