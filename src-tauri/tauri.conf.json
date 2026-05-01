@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "D3 Force Graph",
+  "productName": "AgentGraph",
   "version": "0.1.0",
   "identifier": "com.opencodedev.d3-force-graph",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "D3 Force Graph",
+        "title": "AgentGraph",
         "width": 1280,
         "height": 820,
         "minWidth": 900,
