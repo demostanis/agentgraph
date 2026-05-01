@@ -414,6 +414,7 @@ export class SmoothForceRenderer {
     label.addEventListener("pointerleave", this.handleLabelPointerLeave);
     label.addEventListener("pointermove", this.stopLabelPointerEvent);
     label.addEventListener("pointerdown", this.stopLabelPointerEvent);
+    label.draggable = false;
     this.container.appendChild(label);
     return label;
   }
@@ -865,6 +866,8 @@ export class SmoothForceRenderer {
       return;
     }
 
+    event.preventDefault();
+    this.clearNativeSelection();
     this.container.setPointerCapture(event.pointerId);
     this.pointerDownScreen.set(event.clientX, event.clientY);
     this.pointerDownNodeIndex = -1;
@@ -1003,8 +1006,19 @@ export class SmoothForceRenderer {
   };
 
   private stopLabelPointerEvent = (event: PointerEvent): void => {
+    event.preventDefault();
     event.stopPropagation();
   };
+
+  private clearNativeSelection(): void {
+    const selection = window.getSelection();
+
+    if (!selection || selection.isCollapsed) {
+      return;
+    }
+
+    selection.removeAllRanges();
+  }
 
   private handleWheel = (event: WheelEvent): void => {
     event.preventDefault();

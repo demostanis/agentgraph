@@ -319,6 +319,19 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     }
   };
 
+  const selectAllHandler = (event: KeyboardEvent): void => {
+    if ((!event.ctrlKey && !event.metaKey) || event.key.toLowerCase() !== "a") {
+      return;
+    }
+
+    if (isTextSelectionContext(event.target, elements.nodeContent)) {
+      return;
+    }
+
+    event.preventDefault();
+    window.getSelection()?.removeAllRanges();
+  };
+
   const createRenderer = async (): Promise<void> => {
     fullGraph = await loadNodeGraph();
     syncTimeValues(fullGraph);
@@ -381,6 +394,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   elements.nodeSearchInput.addEventListener("input", scheduleSearch);
   elements.nodeSearchForm.addEventListener("submit", searchSubmitHandler);
   elements.nodeSearchResults.addEventListener("click", searchResultsClickHandler);
+  document.addEventListener("keydown", selectAllHandler);
 
   return {
     destroy: () => {
@@ -399,6 +413,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       elements.nodeSearchInput.removeEventListener("input", scheduleSearch);
       elements.nodeSearchForm.removeEventListener("submit", searchSubmitHandler);
       elements.nodeSearchResults.removeEventListener("click", searchResultsClickHandler);
+      document.removeEventListener("keydown", selectAllHandler);
       nodePanel.dispose();
       renderer?.dispose();
       app.replaceChildren();
@@ -568,6 +583,26 @@ function createSearchResultElement(result: NodeSearchResult): HTMLButtonElement 
 
   button.append(title, excerpt);
   return button;
+}
+
+function isTextSelectionContext(target: EventTarget | null, nodeContent: HTMLElement): boolean {
+  const element = target instanceof HTMLElement ? target : null;
+
+  if (element && (element.closest(".node-content") || element.isContentEditable)) {
+    return true;
+  }
+
+  if (target instanceof HTMLTextAreaElement) {
+    return true;
+  }
+
+  if (target instanceof HTMLInputElement) {
+    return ["email", "number", "password", "search", "tel", "text", "url"].includes(target.type);
+  }
+
+  const selection = window.getSelection();
+  const selectedNode = selection?.anchorNode ?? null;
+  return selectedNode ? nodeContent.contains(selectedNode) : false;
 }
 
 function getUnlinkedBacklinks(node: GraphNode, nodes: GraphNode[]): GraphNode[] {

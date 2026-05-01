@@ -41,6 +41,8 @@ body {
   position: relative;
   min-height: 100vh;
   isolation: isolate;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .shell::before {
@@ -148,6 +150,8 @@ body {
   position: absolute;
   inset: 0;
   z-index: 0;
+  -webkit-user-select: none;
+  user-select: none;
   transition: filter 320ms ease, transform 320ms ease;
 }
 
@@ -162,7 +166,9 @@ body {
   height: 100%;
   cursor: grab;
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-user-drag: none;
 }
 
 .graph-stage.is-hovering canvas {
@@ -195,8 +201,6 @@ body {
 
 .hover-node-clone.is-visible {
   opacity: 1;
-  pointer-events: auto;
-  cursor: pointer;
 }
 
 .node-label {
@@ -223,6 +227,8 @@ body {
   white-space: normal;
   opacity: 0;
   pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
   -webkit-backdrop-filter: blur(12px) saturate(1.12);
   backdrop-filter: blur(12px) saturate(1.12);
   transform-origin: top center;
@@ -555,6 +561,8 @@ body {
   font-size: 0.8rem;
   font-weight: 600;
   outline: none;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .node-search__input-wrap input::placeholder {
@@ -934,6 +942,12 @@ body {
 .node-content ul,
 .node-content pre {
   margin-top: 0;
+}
+
+.node-content,
+.node-content * {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .node-content h1 {
