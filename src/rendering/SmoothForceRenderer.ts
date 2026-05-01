@@ -1057,8 +1057,8 @@ export class SmoothForceRenderer {
       const nodeScreenX = (position.x * 0.5 + 0.5) * this.viewportWidth;
       const nodeScreenY = (-position.y * 0.5 + 0.5) * this.viewportHeight;
       const nodeRadiusPx = node.radius * this.camera.zoom;
-      const bridgeLeft = Math.min(labelRect.left - this.viewportLeft, nodeScreenX - nodeRadiusPx) - LABEL_HOVER_BRIDGE_PADDING;
-      const bridgeRight = Math.max(labelRect.right - this.viewportLeft, nodeScreenX + nodeRadiusPx) + LABEL_HOVER_BRIDGE_PADDING;
+      const bridgeLeft = nodeScreenX - nodeRadiusPx - LABEL_HOVER_BRIDGE_PADDING;
+      const bridgeRight = nodeScreenX + nodeRadiusPx + LABEL_HOVER_BRIDGE_PADDING;
       const bridgeTop = nodeScreenY - LABEL_HOVER_BRIDGE_PADDING;
       const bridgeBottom = labelRect.top - this.viewportTop + LABEL_HOVER_BRIDGE_PADDING;
 
