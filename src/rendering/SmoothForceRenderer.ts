@@ -39,6 +39,7 @@ export class SmoothForceRenderer {
   private readonly clock = new THREE.Clock();
   private readonly resizeObserver: ResizeObserver;
   private readonly nodeLabels: HTMLSpanElement[];
+  private readonly hoverNodeClone: HTMLDivElement;
   private readonly nodeGlowGeometry = new THREE.BufferGeometry();
   private readonly hoverGlowGeometry = new THREE.BufferGeometry();
   private readonly nodeGlowMaterial: THREE.ShaderMaterial;
@@ -126,6 +127,7 @@ export class SmoothForceRenderer {
     this.webgl.domElement.style.touchAction = "none";
     this.container.appendChild(this.webgl.domElement);
     this.nodeLabels = this.nodes.map((node) => this.createNodeLabel(node));
+    this.hoverNodeClone = this.createHoverNodeClone();
 
     this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);
@@ -388,6 +390,7 @@ export class SmoothForceRenderer {
     window.removeEventListener("visibilitychange", this.handleVisibilityChange);
     this.container.classList.remove("is-hovering", "is-dragging-node", "is-panning", "has-selection");
     this.nodeLabels.forEach((label) => this.removeNodeLabel(label));
+    this.hoverNodeClone.remove();
     this.disposeScene();
     this.webgl.domElement.remove();
     this.webgl.dispose();
@@ -413,6 +416,14 @@ export class SmoothForceRenderer {
     label.addEventListener("pointerdown", this.stopLabelPointerEvent);
     this.container.appendChild(label);
     return label;
+  }
+
+  private createHoverNodeClone(): HTMLDivElement {
+    const clone = document.createElement("div");
+    clone.className = "hover-node-clone";
+    clone.setAttribute("aria-hidden", "true");
+    this.container.appendChild(clone);
+    return clone;
   }
 
   private removeNodeLabel(label: HTMLSpanElement): void {
@@ -554,6 +565,7 @@ export class SmoothForceRenderer {
 
   private updateCameraOnlyVisuals(): void {
     this.updateDimPlane();
+    this.updateHoverNodeClone();
     this.updateLabels();
     this.nodeGlowMaterial.uniforms.cameraZoom.value = this.camera.zoom;
     this.hoverGlowMaterial.uniforms.cameraZoom.value = this.camera.zoom;
@@ -615,6 +627,7 @@ export class SmoothForceRenderer {
     });
 
     this.updateHoverOverlay(delta);
+    this.updateHoverNodeClone();
     this.updateLabels();
     this.nodeGlowMaterial.uniforms.cameraZoom.value = this.camera.zoom;
     this.hoverGlowMaterial.uniforms.cameraZoom.value = this.camera.zoom;
@@ -720,6 +733,44 @@ export class SmoothForceRenderer {
       label.style.transform = `translate3d(${screenX.toFixed(1)}px, ${(screenY + nodeRadiusPx + 7).toFixed(1)}px, 0) translate(-50%, 0) scale(${scale.toFixed(3)})`;
       this.showLabel(index, opacity, isActive, isLinked && !isActive);
     });
+  }
+
+  private updateHoverNodeClone(): void {
+    const activeIndex = this.selectedIndex !== -1 ? this.selectedIndex : this.hoveredIndex;
+
+    if (activeIndex === -1) {
+      this.hideHoverNodeClone();
+      return;
+    }
+
+    const node = this.nodes[activeIndex];
+
+    if (!node) {
+      this.hideHoverNodeClone();
+      return;
+    }
+
+    const position = this.labelProjection.set(node.renderX, node.renderY, 0.42).project(this.camera);
+    const isInViewport = position.x > -1.12 && position.x < 1.12 && position.y > -1.12 && position.y < 1.12;
+
+    if (!isInViewport) {
+      this.hideHoverNodeClone();
+      return;
+    }
+
+    const screenX = (position.x * 0.5 + 0.5) * this.viewportWidth;
+    const screenY = (-position.y * 0.5 + 0.5) * this.viewportHeight;
+    const focusScale = 1 + this.focusLevels[activeIndex] * 0.08;
+    const appearance = this.appearanceLevels[activeIndex] ?? 1;
+    const diameter = Math.max(node.radius * focusScale * appearance * this.camera.zoom * 2, 1);
+
+    this.hoverNodeClone.style.setProperty("--hover-node-size", `${diameter.toFixed(2)}px`);
+    this.hoverNodeClone.style.transform = `translate3d(${screenX.toFixed(1)}px, ${screenY.toFixed(1)}px, 0) translate(-50%, -50%)`;
+    this.hoverNodeClone.classList.add("is-visible");
+  }
+
+  private hideHoverNodeClone(): void {
+    this.hoverNodeClone.classList.remove("is-visible");
   }
 
   private updateDimPlane(): void {
