@@ -40,15 +40,107 @@ flowchart TD
 
 Good node graphs feel browsable. A reader should be able to start anywhere, follow links, and understand the important context without reading the full conversation.
 
+## Project Identity
+
+Always preserve the project identity when one can be inferred. Use the clearest project, product, repository, directory, or branch name that anchors the conversation.
+
+- Look for an explicit project name in the conversation first.
+- If none is explicit, infer it from the working directory name, repository name, package name, or remote URL.
+- If the branch name adds useful context, include it as the workstream or feature context, such as `Agentgraph Skill Updates` from an `agentgraph` repo on a `skill-node-granularity` branch.
+- The branch name can be specified in node content when it clarifies the workstream, feature, or reason the conversation happened.
+- Include the project name in the overview node description and in any generic titles or opening sentences where otherwise the node would be ambiguous.
+- Do not invent a project name when there is no reliable signal; use a descriptive workstream phrase instead.
+
 ## Node Granularity
 
 Create many nodes, but avoid atomizing into noise.
 
 - One node per durable idea: a decision, requirement, concept, risk, workflow, or action set.
 - Use 6-20 nodes for a substantial conversation; fewer for short chats, more for long transcripts.
-- Keep each node body focused: usually 80-250 words or a compact checklist.
+- Keep each node body as detailed as the durable knowledge requires, including code snippets, diagrams, sources, paths, commands, or evidence when they help future readers understand or reproduce the point.
 - Link to 2-6 related nodes where helpful.
 - Do not create nodes for pleasantries, status chatter, terminal noise, or generic tool confirmations.
+- Keep a single feature as a single node unless the conversation introduces separate architectural decisions or cross-cutting constraints.
+- Create new nodes only for important durable knowledge, especially architectural changes, behavioral contracts, decisions, constraints, risks, and follow-up actions.
+- Avoid splitting one feature into implementation-detail nodes for UI, API, tests, config, or files unless one of those details changes the architecture or future behavior.
+
+### Behavior Changes And Existing Nodes
+
+When the conversation changes behavior that an existing node already explains, update the old node instead of leaving stale guidance in place.
+
+- Search for existing nodes that describe the old behavior before creating a replacement.
+- Edit the old behavior node so it reflects the current behavior and no longer teaches the wrong model.
+- Always create or update a separate decision/rationale node that explains why the behavior changed.
+- Link the updated behavior node to the rationale node, and link the rationale node back to the affected behavior node.
+- Do not create both an old-behavior node and a new-behavior node unless the historical contrast is itself important future knowledge.
+
+Good granularity:
+
+```markdown
+# Agentgraph Conversation Node Summarizer Feature Granularity
+
+The Agentgraph summarizer treats a single user-facing feature as one durable node unless a separate architectural decision needs its own rationale.
+
+- "Export selected nodes" stays one feature node even if the implementation touched routing, commands, and tests.
+- A separate node is appropriate only if the export feature introduces a new graph serialization contract that future work must preserve.
+
+This connects to [[Agentgraph Export Serialization Decision]] when readers need the architectural reason.
+```
+
+Behavior update example:
+
+```markdown
+# Agentgraph Node Link Validation Behavior
+
+Agentgraph node link validation now treats unresolved wiki links as graph-quality errors that must be fixed before summarization work is complete.
+
+This behavior changed because [[Agentgraph Link Validation Rationale]] found that unresolved links made generated node graphs hard to browse and easy to misinterpret.
+```
+
+```markdown
+# Agentgraph Link Validation Rationale
+
+Agentgraph link validation became mandatory because broken `[[Wiki Links]]` remove the navigation value of the node graph.
+
+- The previous behavior allowed summaries to finish with missing targets.
+- The new behavior requires creating the target node or revising the link to an existing title.
+
+This explains the current behavior in [[Agentgraph Node Link Validation Behavior]].
+```
+
+Detailed source-backed node example:
+
+````markdown
+# Agentgraph Remotion Preview Export
+
+Agentgraph added a Remotion-based preview export on branch `feature/remotion-preview-export`, with implementation tracked in GitHub PR #42.
+
+- Technologies added: `remotion`, `@remotion/renderer`, and a Vite route that renders selected graph nodes into a shareable video preview.
+- External sources checked: Remotion composition docs (`https://www.remotion.dev/docs/composition`) for frame sizing and Remotion rendering docs (`https://www.remotion.dev/docs/renderer/render-media`) for server-side export constraints.
+- The feature stays one node because the UI, route, and test changes all serve the same preview-export behavior; [[Agentgraph Remotion Rendering Decision]] explains the architectural choice to render through Remotion instead of custom canvas capture.
+
+Key implementation shape:
+
+```tsx
+export const PreviewComposition = ({ nodes }: { nodes: GraphNode[] }) => (
+  <AbsoluteFill className="preview-export">
+    <NodeTimeline nodes={nodes} />
+  </AbsoluteFill>
+);
+```
+
+The PR discussion matters because it records why browser-only capture was rejected: it produced inconsistent fonts and layout timing across machines.
+````
+
+Poor granularity:
+
+```markdown
+# Export Button Component
+# Export Route Handler
+# Export Test Command
+
+These nodes describe pieces of one feature without preserving a separate durable decision or architectural contract.
+```
 
 ## Conversation Extraction Pass
 
@@ -75,6 +167,7 @@ Use direct, information-dense prose.
 - Prefer bullets for decisions, requirements, and actions.
 - Keep titles stable and linkable: Title Case, no dates unless the node is event-specific.
 - Titles must be unique. Include the project, product, customer, or workstream name when a generic title would collide, such as `Atlas Sync Decisions` instead of `Decisions`.
+- If a project name is known, include it in the overview node's opening description and in generic behavior, decision, and feature node titles.
 - Use `[[Exact Node Title]]` links. Link titles must match node headings.
 - Prefer links embedded in natural sentences over a trailing `Related:` line.
 - Include source hints only when useful: file paths, command names, issue IDs, URLs, or timestamps.
@@ -107,10 +200,12 @@ The assistant created the nodes successfully, verified with linting, sent the re
 
 ## Script Workflow
 
-1. Search before creating, to avoid duplicates.
-2. Create or update nodes with the repository scripts rather than writing ad hoc files.
-3. Run `check-node-links.sh` after changing linked nodes.
-4. If a link is missing, create the target node or revise the link to an existing title.
+1. Identify the project name from the conversation, directory, repo, package, remote, or branch when available.
+2. Search before creating, to avoid duplicates and find stale behavior nodes that should be updated.
+3. Create or update nodes with the repository scripts rather than writing ad hoc files.
+4. When behavior changes, update the existing behavior node and create or update a linked rationale node that explains why.
+5. Run `check-node-links.sh` after changing linked nodes.
+6. If a link is missing, create the target node or revise the link to an existing title.
 
 ### Search For Existing Nodes
 
@@ -194,8 +289,11 @@ flowchart TD
 Before responding, check the graph against this list:
 
 - The overview node links to every major node.
+- The overview description names the project or workstream when one can be inferred.
 - Every `[[Wiki Link]]` points to an existing node title.
 - Each node captures one durable idea, not a transcript slice.
+- A single feature remains a single node unless an architectural decision needs a separate node.
+- Existing behavior nodes are updated when behavior changes, with a linked rationale node explaining why.
 - Repeated facts are centralized in one node and linked from others.
 - Node bodies omit irrelevant status claims, delivery notes, and assistant self-reporting.
 
