@@ -10,4 +10,4 @@ The node search feature spans the Tauri backend, data bridge, app controller, sh
 - `src/app.ts` debounces input, renders results, handles errors, and selects matching nodes.
 - `src/styles.css` positions and styles the glassy search bar and result list.
 
-These files extend the architecture in [[D3 Force Graph Repo Overview]] and the bridge described by [[Tauri Node File Bridge]].
+These files extend the architecture in [[AgentGraph Project Overview]] and the bridge described by [[Tauri Node File Bridge]].

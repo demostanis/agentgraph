@@ -10,3 +10,5 @@ The temporal graph feature spans UI, data loading, filtering, rendering, and cam
 - `src/rendering/SmoothForceRenderer.ts` and `src/interaction/cameraController.ts` implement graph and selected-node camera following.
 
 This node gives file-level context for [[Temporal Graph Time Filter Requirements]], [[Time Filter UI Contract]], and [[Graph Camera Follow Behavior]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

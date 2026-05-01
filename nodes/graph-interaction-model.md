@@ -9,3 +9,5 @@ Pointer and camera behavior make the graph feel directly manipulable.
 - Wheel input disables selection auto-follow, accumulates normalized deltas, zooms around the cursor, and temporarily lowers render pixel ratio.
 
 This interaction layer is implemented inside [[Smooth Force Renderer]] with supporting helpers in `src/interaction/`.
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

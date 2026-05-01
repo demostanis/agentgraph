@@ -9,3 +9,5 @@ Repository scripts are the intended way to maintain the Markdown node graph from
 - npm aliases in `package.json` expose the same tools as `npm run node:add --`, `npm run node:edit --`, and related commands.
 
 These scripts protect the graph described in [[Markdown Node Graph Data Pipeline]] and should be run before relying on [[Build And Runtime Commands]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

@@ -7,3 +7,5 @@ Inline Markdown formatting should isolate code spans before applying emphasis, b
 - This ordering prevents `_` characters in identifiers from being interpreted as `<em>` while preserving normal emphasis outside code.
 
 This supports [[Inline Code Emphasis Rendering Bug]] and keeps the behavior documented in [[Node Panel Markdown Rendering]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

@@ -7,3 +7,4 @@ This node crosses into the next day to make date transitions visible in the read
 - [[Timeline Signal - Evening Wrap]]
 - [[Timeline Signal - Dawn Sync]]
 - [[Tauri Node File Bridge]]
+- [[AgentGraph Project Overview]]

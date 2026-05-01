@@ -10,3 +10,5 @@ The interface uses a dark cosmic graph style with glowing nodes and a glassy rea
 - Reduced-motion preferences disable major CSS transitions.
 
 This design supports [[Smooth Force Renderer]] and [[Node Panel Markdown Rendering]] rather than relying on a generic document list UI.
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

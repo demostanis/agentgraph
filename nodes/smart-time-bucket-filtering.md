@@ -10,3 +10,5 @@ The slider uses smart buckets derived from actual node timestamps instead of raw
 - The left handle is clamped so it cannot logically pass the right handle, preventing inverted spans.
 
 This supports [[Temporal Graph Time Filter Requirements]] while preserving the smooth feel described by [[Time Filter UI Contract]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

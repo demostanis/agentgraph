@@ -10,3 +10,5 @@ The side panel turns selected Markdown nodes into readable, interactive detail v
 - Mermaid blocks render through lazy-loaded Mermaid with strict security and the app dark theme.
 
 Panel wiki-link clicks call back into [[Smooth Force Renderer]] to select the linked node by title. The inline-code edge case is captured in [[Inline Code Emphasis Rendering Bug]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

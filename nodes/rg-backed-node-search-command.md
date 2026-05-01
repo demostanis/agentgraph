@@ -9,3 +9,5 @@ The backend exposes node search as a Tauri command that shells out to ripgrep.
 - The command limits the returned list after ranking to keep the search panel manageable.
 
 This extends [[Tauri Node File Bridge]] and feeds [[Node Search Result Ranking]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

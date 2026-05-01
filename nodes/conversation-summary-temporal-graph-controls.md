@@ -13,3 +13,5 @@ The conversation evolved a graph time-filter feature into a richer temporal navi
 - [[Timeline Test Nodes]] records the synthetic nodes used to exercise the feature.
 
 Useful implementation areas include `src/app.ts`, `src/ui/shell.ts`, `src/styles.css`, `src/data/nodeGraph.ts`, `src-tauri/src/lib.rs`, `src/rendering/SmoothForceRenderer.ts`, and `src/interaction/cameraController.ts`.
+
+This conversation belongs to [[AgentGraph Project Overview]] so the workstream remains connected to the main AgentGraph project context.

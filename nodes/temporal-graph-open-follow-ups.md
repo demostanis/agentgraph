@@ -9,3 +9,5 @@ Several follow-ups could improve the temporal graph controls after more hands-on
 - Decide whether test timeline nodes should remain in the repository or be replaced by fixtures.
 
 These questions relate to [[Time Filter UI Contract]], [[Graph Camera Follow Behavior]], and [[Timeline Test Nodes]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

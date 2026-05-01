@@ -7,3 +7,5 @@ Underscores inside backtick-delimited inline code must remain literal text, not 
 - Success means inline code spans preserve escaped contents exactly while surrounding Markdown can still render links, bold text, and emphasis.
 
 This bug connects to [[Markdown Inline Formatting Order]] because parser ordering determines whether emphasis sees code-span contents.
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

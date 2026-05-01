@@ -9,3 +9,5 @@ The Rust side bridges local Markdown files into the browser runtime.
 - A `notify` watcher emits `nodes://changed` for Markdown create, modify, and remove events.
 
 The TypeScript side consumes this through [[Markdown Node Graph Data Pipeline]] and refreshes the live scene through [[Smooth Force Renderer]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

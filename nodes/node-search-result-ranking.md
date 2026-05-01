@@ -10,3 +10,5 @@ Node search results are sorted by pertinence before they reach the UI.
 - The excerpt comes from the best-scoring match for that node, not necessarily the first raw match.
 
 This ranking belongs to [[Rg Backed Node Search Command]] and satisfies [[Node Search Requirements]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

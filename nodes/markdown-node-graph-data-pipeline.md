@@ -9,3 +9,5 @@ Markdown files in `nodes/` are the source of truth for the graph.
 - New nodes receive seeded cluster positions using `mulberry32(1729)` and the cluster list in `src/config/graphConfig.ts`.
 
 This feeds [[Smooth Force Renderer]] and depends on [[Tauri Node File Bridge]] for live runtime file access.
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

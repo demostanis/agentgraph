@@ -9,4 +9,4 @@ The project uses Vite for the web frontend and Tauri for the desktop shell.
 - `npm run screenshot` executes `dev-scripts/screenshot.mjs`, and `npm run node:test` exercises the node helper scripts.
 - Core runtime dependencies are `three`, `d3-force`, `@tauri-apps/api`, `highlight.js`, and `mermaid`.
 
-These commands operate on the architecture summarized in [[D3 Force Graph Repo Overview]].
+These commands operate on the architecture summarized in [[AgentGraph Project Overview]].

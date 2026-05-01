@@ -7,3 +7,4 @@ An afternoon note for testing how the graph rebalances when the visible time win
 - [[Timeline Signal - Lunch Checkpoint]]
 - [[Timeline Signal - Evening Wrap]]
 - [[Force Simulation Layout]]
+- [[AgentGraph Project Overview]]

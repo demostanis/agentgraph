@@ -9,3 +9,5 @@
 - Static capacities default to 4096 nodes and 16384 links; oversized live updates are skipped rather than reallocating buffers.
 
 It receives graph data from [[Markdown Node Graph Data Pipeline]] and behavior inputs from [[Graph Interaction Model]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

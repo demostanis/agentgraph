@@ -9,3 +9,5 @@ Graph layout is handled by a stopped D3 force simulation that the renderer advan
 - Simulation decay settings are tuned for smooth, persistent movement rather than a one-time static layout.
 
 The layout model supports [[Smooth Force Renderer]] and is navigated through [[Graph Interaction Model]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

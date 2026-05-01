@@ -9,3 +9,5 @@ The graph needs a search bar that finds Markdown nodes by title and content.
 - The visible interface should say `Search`, not expose `rg` as product copy.
 
 This requirement is implemented by [[Rg Backed Node Search Command]] and displayed through [[Node Search UI Contract]]. Node selection reuses the behavior described in [[Cross-Time Link Navigation]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

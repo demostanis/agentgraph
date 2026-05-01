@@ -9,3 +9,5 @@ Synthetic timeline nodes were added to exercise temporal filtering across multip
 - These files are useful for validating collapsed `All time`, fixed bucket filtering, span filtering, and camera refitting.
 
 This test data depends on the [[Time Metadata Source Decision]] and validates [[Smart Time Bucket Filtering]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

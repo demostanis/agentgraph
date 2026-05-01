@@ -12,3 +12,5 @@ A Markdown rendering bug made underscores inside inline code render as italic em
 
 - `src/utils/markdown.ts` contains the inline Markdown formatter.
 - `npm run web:build` exercises TypeScript and the Vite production build after renderer changes.
+
+This conversation belongs to [[AgentGraph Project Overview]] so the workstream remains connected to the main AgentGraph project context.

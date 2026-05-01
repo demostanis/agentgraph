@@ -11,3 +11,5 @@ The conversation added a search feature for the Markdown node graph and refined 
 - [[Node Search Implementation Files]] lists the files that carry the feature.
 
 The feature connects the runtime node file bridge in [[Tauri Node File Bridge]] with the graph navigation model in [[Graph Interaction Model]] so a search result can open the matching node.
+
+This conversation belongs to [[AgentGraph Project Overview]] so the workstream remains connected to the main AgentGraph project context.

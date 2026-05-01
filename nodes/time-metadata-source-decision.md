@@ -9,3 +9,5 @@ Node timestamps come from file modification metadata, not from node markdown con
 - Markdown node headers should not be used as a hidden timestamp channel.
 
 This decision directly affects [[Timeline Test Nodes]] and the behavior implemented for [[Smart Time Bucket Filtering]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.

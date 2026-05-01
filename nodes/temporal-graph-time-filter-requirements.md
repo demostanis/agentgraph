@@ -10,3 +10,5 @@ The graph needs temporal filtering that feels like navigating meaningful node hi
 - Nearby node timestamps should collapse into one step when multiple nodes were created or modified within a few minutes.
 
 This requirement connects to [[Smart Time Bucket Filtering]] for the mechanics and to [[Cross-Time Link Navigation]] because node links may need to change the current time span automatically. The presentation details live in [[Time Filter UI Contract]].
+
+This belongs to [[AgentGraph Project Overview]] as part of the AgentGraph project knowledge graph.
