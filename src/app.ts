@@ -252,7 +252,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   };
 
   const timeModeToggleHandler = (event: MouseEvent): void => {
-    if ((event.target as HTMLElement | null)?.closest("button")) {
+    if (!(event.target as HTMLElement | null)?.closest(".time-filter__range-stack")) {
       return;
     }
 
