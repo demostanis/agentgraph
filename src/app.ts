@@ -32,6 +32,9 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   let currentGraph: Graph = { nodes: [], links: [] };
   let selectedNodeId: string | null = null;
   let isTimeFilterExpanded = false;
+  let isSearchExpanded = false;
+  let areSearchResultsVisible = true;
+  let shouldRestoreSearchAfterSelection = false;
   let refreshTimeout = 0;
   let searchTimeout = 0;
   let activeSearchToken = 0;
@@ -64,10 +67,14 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       onNodeBack: () => navigateNodePanelBack(),
     },
   );
+
   const backClickHandler = (): void => {
     nodePanelHistory.length = 0;
     nodePanel.setCanGoBack(false);
+    areSearchResultsVisible = true;
     renderer?.clearSelection();
+    elements.stage.classList.remove("has-selection");
+    renderSearchControls();
   };
 
   const renderTimeControls = (): void => {
@@ -88,7 +95,9 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
 
     const readout = formatTimeReadout(timeFilterState);
     elements.timeFilterCurrentLabel.textContent = readout;
-    elements.timeFilter.style.setProperty("--time-filter-width", `${getTimeFilterWidth(readout, isTimeFilterExpanded)}px`);
+    const timeFilterWidth = getTimeFilterWidth(readout, isTimeFilterExpanded);
+    elements.app.style.setProperty("--time-filter-width", `${timeFilterWidth}px`);
+    elements.app.style.setProperty("--time-filter-half-width", `${timeFilterWidth / 2}px`);
     elements.timeFilter.classList.toggle("is-disabled", isDisabled);
     elements.timeFilter.classList.toggle("is-span-mode", timeFilterState.mode === "span");
     elements.timeFilter.classList.toggle("is-expanded", isTimeFilterExpanded);
@@ -96,6 +105,32 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     elements.timeFilterToggle.setAttribute("aria-expanded", String(isTimeFilterExpanded));
     elements.timeFilterToggle.setAttribute("aria-label", isTimeFilterExpanded ? "Hide time slider" : "Show time slider");
     elements.timeFilter.setAttribute("aria-label", `Filter nodes by ${timeFilterState.mode === "span" ? "time span" : "fixed day-hour"}; double click to toggle mode`);
+  };
+
+  const renderSearchControls = (): void => {
+    elements.app.classList.toggle("is-search-expanded", isSearchExpanded);
+    elements.nodeSearch.classList.toggle("is-expanded", isSearchExpanded);
+    elements.nodeSearch.classList.remove("is-results-suppressed");
+    elements.nodeSearch.classList.toggle("is-results-hidden", !areSearchResultsVisible);
+    elements.nodeSearchToggle.setAttribute("aria-expanded", String(isSearchExpanded));
+    elements.nodeSearchToggle.setAttribute("aria-label", isSearchExpanded ? "Collapse node search" : "Expand node search");
+    elements.nodeSearchInput.tabIndex = isSearchExpanded ? 0 : -1;
+  };
+
+  const setSearchExpanded = (isExpanded: boolean, shouldFocus = false): void => {
+    isSearchExpanded = isExpanded;
+    renderSearchControls();
+
+    if (isExpanded && shouldFocus) {
+      areSearchResultsVisible = true;
+      renderSearchControls();
+      window.requestAnimationFrame(() => elements.nodeSearchInput.focus());
+      return;
+    }
+
+    if (!isExpanded && document.activeElement === elements.nodeSearchInput) {
+      elements.nodeSearchInput.blur();
+    }
   };
 
   const syncTimeValues = (graph: Graph): void => {
@@ -136,6 +171,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     renderer?.syncGraph(graph.nodes, graph.links, simulation);
     renderer?.fitVisibleNodes();
     renderTimeControls();
+    renderSearchControls();
   };
 
   const includeLinkedNodeInTimeSpan = (targetNode: GraphNode): void => {
@@ -238,6 +274,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       }
     }
 
+    areSearchResultsVisible = false;
     applyTimeFilter();
   };
 
@@ -261,32 +298,41 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     }
 
     timeFilterState.mode = timeFilterState.mode === "fixed" ? "span" : "fixed";
+    areSearchResultsVisible = false;
     applyTimeFilter();
   };
 
   const timeFilterToggleHandler = (): void => {
     isTimeFilterExpanded = !isTimeFilterExpanded;
+    areSearchResultsVisible = false;
     renderTimeControls();
+    renderSearchControls();
   };
 
   const clearSearchResults = (message = ""): void => {
+    areSearchResultsVisible = true;
     elements.nodeSearch.classList.remove("has-results", "is-loading", "has-error");
     elements.nodeSearchStatus.textContent = message;
     elements.nodeSearchResults.replaceChildren();
+    renderSearchControls();
   };
 
   const renderSearchResults = (query: string, results: NodeSearchResult[]): void => {
+    areSearchResultsVisible = true;
     elements.nodeSearch.classList.remove("is-loading", "has-error");
     elements.nodeSearch.classList.toggle("has-results", results.length > 0);
     elements.nodeSearchStatus.textContent = results.length === 0 ? `No matches for "${query}".` : `${results.length} search result${results.length === 1 ? "" : "s"}.`;
     elements.nodeSearchResults.replaceChildren(...results.map(createSearchResultElement));
+    renderSearchControls();
   };
 
   const renderSearchError = (message: string): void => {
+    areSearchResultsVisible = true;
     elements.nodeSearch.classList.remove("is-loading", "has-results");
     elements.nodeSearch.classList.add("has-error");
     elements.nodeSearchStatus.textContent = message;
     elements.nodeSearchResults.replaceChildren();
+    renderSearchControls();
   };
 
   const runSearch = async (query: string, token: number): Promise<void> => {
@@ -315,6 +361,8 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     const query = elements.nodeSearchInput.value.trim();
     window.clearTimeout(searchTimeout);
     activeSearchToken += 1;
+    areSearchResultsVisible = true;
+    renderSearchControls();
 
     if (!query) {
       clearSearchResults();
@@ -329,6 +377,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
 
   const searchSubmitHandler = (event: SubmitEvent): void => {
     event.preventDefault();
+    setSearchExpanded(true);
     window.clearTimeout(searchTimeout);
     activeSearchToken += 1;
     const query = elements.nodeSearchInput.value.trim();
@@ -339,6 +388,15 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
     }
 
     void runSearch(query, activeSearchToken);
+  };
+
+  const revealSearchResultsHandler = (): void => {
+    if (areSearchResultsVisible) {
+      return;
+    }
+
+    areSearchResultsVisible = true;
+    renderSearchControls();
   };
 
   const searchResultsClickHandler = (event: MouseEvent): void => {
@@ -352,7 +410,48 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
 
     if (targetNode) {
       selectNode(targetNode, true);
+      areSearchResultsVisible = !areSearchResultsVisible;
+      renderSearchControls();
     }
+  };
+
+  const searchResultsPointerOverHandler = (event: PointerEvent): void => {
+    const resultButton = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("button[data-node-id]");
+
+    if (!resultButton || !elements.nodeSearchResults.contains(resultButton)) {
+      return;
+    }
+
+    renderer?.hoverNodeById(resultButton.dataset.nodeId ?? null);
+  };
+
+  const searchResultsPointerOutHandler = (event: PointerEvent): void => {
+    const resultButton = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("button[data-node-id]");
+
+    if (!resultButton || resultButton.contains(event.relatedTarget as Node | null)) {
+      return;
+    }
+
+    renderer?.hoverNodeById(null);
+  };
+
+  const searchToggleHandler = (): void => {
+    setSearchExpanded(!isSearchExpanded, !isSearchExpanded);
+  };
+
+  const documentPointerDownHandler = (event: PointerEvent): void => {
+    const target = event.target as Node | null;
+
+    if (!isSearchExpanded || elements.nodeSearch.contains(target)) {
+      return;
+    }
+
+    if (selectedNodeId && elements.stage.contains(target)) {
+      return;
+    }
+
+    setSearchExpanded(false);
+    renderer?.hoverNodeById(null);
   };
 
   const selectAllHandler = (event: KeyboardEvent): void => {
@@ -387,14 +486,20 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
             nodePanelHistory.length = 0;
           }
 
+          shouldRestoreSearchAfterSelection = shouldRestoreSearchAfterSelection || isSearchExpanded;
           selectedNodeId = node.id;
           nodePanel.show(node, linkCount, getUnlinkedBacklinks(node, currentGraph.nodes));
           nodePanel.setCanGoBack(nodePanelHistory.length > 0);
         },
         onSelectionClear: () => {
+          const hadSelectedNode = selectedNodeId !== null;
           selectedNodeId = null;
           nodePanelHistory.length = 0;
+          isSearchExpanded = shouldRestoreSearchAfterSelection ? true : isSearchExpanded;
+          shouldRestoreSearchAfterSelection = false;
+          areSearchResultsVisible = hadSelectedNode ? true : areSearchResultsVisible;
           nodePanel.hide();
+          renderSearchControls();
         },
       },
     });
@@ -422,6 +527,7 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
 
   await createRenderer();
   renderTimeControls();
+  renderSearchControls();
   const unlistenNodeChanges = await watchNodeGraph(scheduleGraphRefresh);
 
   elements.backButton.addEventListener("click", backClickHandler);
@@ -433,9 +539,15 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   elements.timeFilterSpan.addEventListener("input", timeInputHandler);
   elements.timeFilter.addEventListener("dblclick", timeModeToggleHandler);
   elements.timeFilterToggle.addEventListener("click", timeFilterToggleHandler);
+  elements.nodeSearchToggle.addEventListener("click", searchToggleHandler);
   elements.nodeSearchInput.addEventListener("input", scheduleSearch);
+  elements.nodeSearchInput.addEventListener("focus", revealSearchResultsHandler);
+  elements.nodeSearchInput.addEventListener("click", revealSearchResultsHandler);
   elements.nodeSearchForm.addEventListener("submit", searchSubmitHandler);
   elements.nodeSearchResults.addEventListener("click", searchResultsClickHandler);
+  elements.nodeSearchResults.addEventListener("pointerover", searchResultsPointerOverHandler);
+  elements.nodeSearchResults.addEventListener("pointerout", searchResultsPointerOutHandler);
+  document.addEventListener("pointerdown", documentPointerDownHandler);
   document.addEventListener("keydown", selectAllHandler);
 
   return {
@@ -452,9 +564,15 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
       elements.timeFilterSpan.removeEventListener("input", timeInputHandler);
       elements.timeFilter.removeEventListener("dblclick", timeModeToggleHandler);
       elements.timeFilterToggle.removeEventListener("click", timeFilterToggleHandler);
+      elements.nodeSearchToggle.removeEventListener("click", searchToggleHandler);
       elements.nodeSearchInput.removeEventListener("input", scheduleSearch);
+      elements.nodeSearchInput.removeEventListener("focus", revealSearchResultsHandler);
+      elements.nodeSearchInput.removeEventListener("click", revealSearchResultsHandler);
       elements.nodeSearchForm.removeEventListener("submit", searchSubmitHandler);
       elements.nodeSearchResults.removeEventListener("click", searchResultsClickHandler);
+      elements.nodeSearchResults.removeEventListener("pointerover", searchResultsPointerOverHandler);
+      elements.nodeSearchResults.removeEventListener("pointerout", searchResultsPointerOutHandler);
+      document.removeEventListener("pointerdown", documentPointerDownHandler);
       document.removeEventListener("keydown", selectAllHandler);
       nodePanel.dispose();
       renderer?.dispose();
@@ -584,11 +702,14 @@ function isAllTimeSelected(timeFilterState: TimeFilterState): boolean {
 }
 
 function getTimeFilterWidth(readout: string, isExpanded: boolean): number {
+  const maxWidth = Math.max(window.innerWidth - (window.innerWidth <= 760 ? 86 : 48), 126);
+
   if (isExpanded) {
-    return Math.min(460, Math.max(window.innerWidth - 48, 260));
+    const preferredWidth = Math.min(460, Math.max(window.innerWidth - 48, 260));
+    return Math.min(preferredWidth, maxWidth);
   }
 
-  return Math.min(Math.max(readout.length * 7.8 + 54, 126), Math.max(window.innerWidth - 48, 126));
+  return Math.min(Math.max(readout.length * 7.8 + 54, 126), maxWidth);
 }
 
 function clampIndex(value: number, length: number): number {

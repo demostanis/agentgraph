@@ -287,6 +287,15 @@ export class SmoothForceRenderer {
     }
   }
 
+  hoverNodeById(nodeId: string | null): void {
+    if (this.selectedIndex !== -1 || this.interactionMode !== "idle") {
+      return;
+    }
+
+    this.hoveredIndex = nodeId ? this.nodes.findIndex((node) => node.id === nodeId) : -1;
+    this.setInteractionClasses();
+  }
+
   syncGraph(nodes: GraphNode[], links: GraphLink[], simulation: Simulation<GraphNode, GraphLink>): void {
     if (nodes.length > this.nodeCapacity || links.length > this.linkCapacity) {
       console.warn(

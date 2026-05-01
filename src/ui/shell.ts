@@ -9,6 +9,7 @@ export type ShellElements = {
   timeFilterToggle: HTMLButtonElement;
   nodeSearch: HTMLElement;
   nodeSearchForm: HTMLFormElement;
+  nodeSearchToggle: HTMLButtonElement;
   nodeSearchInput: HTMLInputElement;
   nodeSearchStatus: HTMLParagraphElement;
   nodeSearchResults: HTMLDivElement;
@@ -52,10 +53,12 @@ export function mountShell(app: HTMLDivElement): ShellElements {
         <form id="node-search-form" class="node-search__form" role="search">
           <label class="node-search__label" for="node-search-input">Search nodes</label>
           <div class="node-search__input-wrap">
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path d="m14.2 14.2 3 3" />
-              <circle cx="8.7" cy="8.7" r="5.8" />
-            </svg>
+            <button id="node-search-toggle" class="node-search__toggle" type="button" aria-label="Expand node search" aria-expanded="false">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m14.2 14.2 3 3" />
+                <circle cx="8.7" cy="8.7" r="5.8" />
+              </svg>
+            </button>
             <input id="node-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Search nodes..." aria-describedby="node-search-status" />
           </div>
         </form>
@@ -107,6 +110,7 @@ export function mountShell(app: HTMLDivElement): ShellElements {
   const timeFilterToggle = app.querySelector<HTMLButtonElement>("#time-filter-toggle");
   const nodeSearch = app.querySelector<HTMLElement>("#node-search");
   const nodeSearchForm = app.querySelector<HTMLFormElement>("#node-search-form");
+  const nodeSearchToggle = app.querySelector<HTMLButtonElement>("#node-search-toggle");
   const nodeSearchInput = app.querySelector<HTMLInputElement>("#node-search-input");
   const nodeSearchStatus = app.querySelector<HTMLParagraphElement>("#node-search-status");
   const nodeSearchResults = app.querySelector<HTMLDivElement>("#node-search-results");
@@ -130,6 +134,7 @@ export function mountShell(app: HTMLDivElement): ShellElements {
     !timeFilterToggle ||
     !nodeSearch ||
     !nodeSearchForm ||
+    !nodeSearchToggle ||
     !nodeSearchInput ||
     !nodeSearchStatus ||
     !nodeSearchResults ||
@@ -157,6 +162,7 @@ export function mountShell(app: HTMLDivElement): ShellElements {
     timeFilterToggle,
     nodeSearch,
     nodeSearchForm,
+    nodeSearchToggle,
     nodeSearchInput,
     nodeSearchStatus,
     nodeSearchResults,
