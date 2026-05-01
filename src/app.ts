@@ -496,6 +496,11 @@ export async function mountApp(app: HTMLDivElement): Promise<AppController> {
   const documentPointerDownHandler = (event: PointerEvent): void => {
     const target = event.target as Node | null;
 
+    if (isTimeFilterExpanded && !elements.timeFilter.contains(target)) {
+      isTimeFilterExpanded = false;
+      renderTimeControls();
+    }
+
     if (!isSearchExpanded || elements.nodeSearch.contains(target)) {
       return;
     }
