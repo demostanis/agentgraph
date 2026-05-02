@@ -1,0 +1,104 @@
+# Maintainer: OpenCode <opencode@example.invalid>
+
+pkgname=agentgraph-git
+_pkgname=agentgraph
+_binname=d3-force-three-renderer
+pkgver=0.1.0.r34.ga87a92d
+pkgrel=1
+pkgdesc='Desktop viewer for agent produced memory nodes'
+arch=('x86_64')
+url='https://github.com/demostanis/agentgraph'
+license=('unknown')
+depends=(
+  'gtk3'
+  'hicolor-icon-theme'
+  'ripgrep'
+  'webkit2gtk-4.1'
+)
+makedepends=(
+  'cargo'
+  'git'
+  'nodejs'
+  'npm'
+  'pkgconf'
+)
+options=('!debug')
+_source_uri="${AGENTGRAPH_SOURCE_URI:-file://${startdir}/../..}"
+source=("${_pkgname}::git+${_source_uri}")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "${_pkgname}"
+
+  local app_version rev_count commit
+  app_version=$(node -p "require('./package.json').version")
+  rev_count=$(git rev-list --count HEAD)
+  commit=$(git rev-parse --short HEAD)
+  printf '%s.r%s.g%s' "${app_version}" "${rev_count}" "${commit}"
+}
+
+prepare() {
+  cd "${_pkgname}"
+
+  export npm_config_cache="${srcdir}/npm-cache"
+  npm ci
+}
+
+build() {
+  cd "${_pkgname}"
+
+  export npm_config_cache="${srcdir}/npm-cache"
+  export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=${srcdir}=."
+  npm run web:build
+
+  cd src-tauri
+  cargo build --release --locked --features custom-protocol
+}
+
+check() {
+  cd "${_pkgname}/src-tauri"
+
+  export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=${srcdir}=."
+  cargo test --release --locked --features custom-protocol
+}
+
+package() {
+  cd "${_pkgname}"
+
+  install -Dm755 "src-tauri/target/release/${_binname}" \
+    "${pkgdir}/usr/lib/${_pkgname}/${_binname}"
+  cp -a .agents/skills/. "${pkgdir}/usr/lib/${_pkgname}/"
+  install -Dm755 scripts/*.sh -t \
+    "${pkgdir}/usr/lib/${_pkgname}/conversation-node-summarizer/scripts/"
+  chmod -R u=rwX,go=rX "${pkgdir}/usr/lib/${_pkgname}"
+  chmod 755 "${pkgdir}/usr/lib/${_pkgname}/${_binname}"
+
+  install -Dm644 'src-tauri/icons/icon.png' \
+    "${pkgdir}/usr/share/icons/hicolor/512x512/apps/${_pkgname}.png"
+
+  install -dm755 "${pkgdir}/usr/bin"
+  cat > "${pkgdir}/usr/bin/${_pkgname}" <<'EOF'
+#!/bin/sh
+if [ -z "${NODE_GRAPH_DIR}" ]; then
+  : "${XDG_DATA_HOME:=${HOME}/.local/share}"
+  NODE_GRAPH_DIR="${XDG_DATA_HOME}/agentgraph/nodes"
+fi
+
+mkdir -p "${NODE_GRAPH_DIR}"
+export NODE_GRAPH_DIR
+exec /usr/lib/agentgraph/d3-force-three-renderer "$@"
+EOF
+  chmod 755 "${pkgdir}/usr/bin/${_pkgname}"
+
+  install -dm755 "${pkgdir}/usr/share/applications"
+  cat > "${pkgdir}/usr/share/applications/${_pkgname}.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=AgentGraph
+Comment=Desktop node graph viewer
+Exec=${_pkgname}
+Icon=${_pkgname}
+Terminal=false
+Categories=Utility;Development;
+EOF
+}

@@ -5,3 +5,7 @@ artifacts/
 /expanded.png
 /page*.png
 src-tauri/target/
+packaging/arch/src/
+packaging/arch/pkg/
+packaging/arch/agentgraph/
+packaging/arch/*.pkg.tar.*

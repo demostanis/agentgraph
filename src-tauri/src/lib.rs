@@ -407,6 +407,7 @@ fn resolve_nodes_dir() -> Result<PathBuf, String> {
         }
     }
 
+    #[cfg(debug_assertions)]
     candidates.push(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
