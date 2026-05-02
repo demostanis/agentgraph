@@ -66,15 +66,16 @@ Create many nodes, but avoid atomizing into noise.
 - Create new nodes only for important durable knowledge, especially architectural changes, behavioral contracts, decisions, constraints, risks, and follow-up actions.
 - Avoid splitting one feature into implementation-detail nodes for UI, API, tests, config, or files unless one of those details changes the architecture or future behavior.
 
-### Behavior Changes And Existing Nodes
+### Existing Node Maintenance
 
-When the conversation changes behavior that an existing node already explains, update the old node instead of leaving stale guidance in place.
+Treat the node graph as living documentation, not an append-only transcript. When the conversation revises, refines, renames, or restyles an artifact that an existing node already explains, update the existing node so readers see the current truth in one place.
 
-- Search for existing nodes that describe the old behavior before creating a replacement.
-- Edit the old behavior node so it reflects the current behavior and no longer teaches the wrong model.
-- Always create or update a separate decision/rationale node that explains why the behavior changed.
-- Link the updated behavior node to the rationale node, and link the rationale node back to the affected behavior node.
-- Do not create both an old-behavior node and a new-behavior node unless the historical contrast is itself important future knowledge.
+- Search for existing nodes about the same project, artifact, feature, behavior, or visual identity before creating a replacement.
+- Edit the existing node so it reflects the current state and no longer teaches stale facts.
+- Prefer updating the main artifact/feature node when a later user request modifies the same artifact, such as changing a prototype's theme, copy, layout, dependencies, or file location.
+- Create a separate decision/rationale node only when the reason for the change is durable future knowledge; do not create a new node merely to record that a small refinement happened.
+- Link the updated node to the rationale node when a rationale node is useful, and link the rationale node back to the affected node.
+- Do not create both old-state and new-state nodes unless the historical contrast is itself important future knowledge.
 
 Good granularity:
 
@@ -109,6 +110,20 @@ Agentgraph link validation became mandatory because broken `[[Wiki Links]]` remo
 
 This explains the current behavior in [[Agentgraph Node Link Validation Behavior]].
 ```
+
+Artifact refinement example:
+
+```markdown
+# SignalOps B2B SaaS Prototype
+
+SignalOps is a Vite + React B2B SaaS landing-page prototype in `/tmp/b2b-saas`.
+
+- The product concept is an operations command center for revenue, risk, and customer teams.
+- The current visual direction uses deep rose, magenta CTA colors, blush surfaces, and pink atmospheric gradients.
+- The page includes responsive landing, metrics, platform cards, workflow, and pricing sections.
+```
+
+This is better than leaving an older node that says the prototype is navy/blue and creating a second node that says the theme is pink. A reader should not have to reconcile contradictory current-state nodes.
 
 Detailed source-backed node example:
 
@@ -173,7 +188,7 @@ Use direct, information-dense prose.
 - Use `[[Exact Node Title]]` links. Link titles must match node headings.
 - Prefer links embedded in natural sentences over a trailing `Related:` line.
 - Include source hints only when useful: file paths, command names, issue IDs, URLs, or timestamps.
-- Avoid filler inside node bodies: no "sent to phone", "verified with linting", "all set", "as requested", "successfully completed", or similar status phrases unless that operational event is the actual subject of the node.
+- Avoid filler inside node bodies: no "sent to phone", "verified with linting", "build passed", "all set", "as requested", "successfully completed", or similar status phrases unless that operational event is the actual subject of the node.
 
 ## Node Noise Filter
 
@@ -181,7 +196,7 @@ The generated nodes are the output. Optimize the node content, not a final chat 
 
 - Exclude execution trivia that does not teach the future reader anything.
 - Exclude tool-delivery notes such as phone notifications, screenshots sent, browser opened, or files handed off.
-- Exclude verification boilerplate such as lint/build/test status unless the conversation is specifically about that verification result.
+- Exclude verification boilerplate such as lint/build/test status unless the user asked to preserve the verification result or the conversation is specifically about diagnosing that verification. Assistant final-message lines like "Verified with `bun run build`; build passed" are delivery status, not durable node content.
 - Exclude generic assistant self-reporting such as "I created", "I updated", "done", or "as requested".
 - Keep operational facts only when they change the knowledge graph: a failed command that caused a decision, a broken link that created an action, or a test result that is evidence for a technical claim.
 
@@ -203,11 +218,12 @@ The assistant created the nodes successfully, verified with linting, sent the re
 ## Script Workflow
 
 1. Identify the project name from the conversation, directory, repo, package, remote, or branch when available.
-2. Search before creating, to avoid duplicates, find the main project/workstream node to link to, and find stale behavior nodes that should be updated.
-3. Create or update nodes with the repository scripts rather than writing ad hoc files.
-4. When behavior changes, update the existing behavior node and create or update a linked rationale node that explains why.
-5. Run `check-node-links.sh` after changing linked nodes.
-6. If a link is missing, create the target node or revise the link to an existing title.
+2. Search before creating, to avoid duplicates, find the main project/workstream node to link to, and find stale nodes that should be updated.
+3. If the conversation modifies an artifact already represented by a node, read that node and plan the edit before adding any new node.
+4. Create or update nodes with the repository scripts rather than writing ad hoc files.
+5. When behavior changes, update the existing behavior node and create or update a linked rationale node only when the rationale is durable future knowledge.
+6. Run `check-node-links.sh` after changing linked nodes.
+7. If a link is missing, create the target node or revise the link to an existing title.
 
 ### Search For Existing Nodes
 
@@ -297,8 +313,9 @@ Before responding, check the graph against this list:
 - Each node captures one durable idea, not a transcript slice.
 - A single feature remains a single node unless an architectural decision needs a separate node.
 - Existing behavior nodes are updated when behavior changes, with a linked rationale node explaining why.
+- Existing artifact or feature nodes are updated when later turns revise the same artifact, so current-state facts are centralized instead of contradicted by newer nodes.
 - Repeated facts are centralized in one node and linked from others.
-- Node bodies omit irrelevant status claims, delivery notes, and assistant self-reporting.
+- Node bodies omit irrelevant status claims, delivery notes, build/test boilerplate, and assistant self-reporting.
 
 ## Edge Cases
 
