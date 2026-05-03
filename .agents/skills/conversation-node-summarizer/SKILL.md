@@ -5,22 +5,22 @@ description: Turn a conversation, chat transcript, meeting thread, planning sess
 
 # Conversation Node Summarizer
 
-Convert conversation history into a useful node graph: many small, linked Markdown files in `nodes/`, created and maintained with the repository scripts in `./scripts`.
+Convert conversation history into a useful node graph: many small, linked Markdown files in `${AG_NODES_DIR:-~/.local/share/agentgraph/nodes}`, created and maintained with the repository scripts in `./scripts`.
 
 The goal is not to make a pretty transcript. The goal is to preserve reusable understanding: what was decided, why it matters, what constraints shaped it, what actions remain, and how concepts connect.
 
 ## Repository Tools
 
-Use these scripts from the repository root:
+Use these scripts from the repository root. They read and write `${AG_NODES_DIR:-~/.local/share/agentgraph/nodes}`; set `AG_NODES_DIR` only when the user explicitly wants a different graph.
 
-| Purpose | Script | npm alias |
-| --- | --- | --- |
-| Add a new node | `./scripts/add-node.sh` | `npm run node:add --` |
-| Replace a node body while preserving its title | `./scripts/edit-node-content.sh` | `npm run node:edit --` |
-| Read a node | `./scripts/get-node-content.sh` | `npm run node:get --` |
-| Search titles | `./scripts/search-nodes-by-title.sh` | `npm run node:search:title --` |
-| Search bodies | `./scripts/search-nodes-by-content.sh` | `npm run node:search:content --` |
-| Verify `[[Wiki Links]]` resolve | `./scripts/check-node-links.sh` | `npm run node:check-links` |
+| Purpose                                        | Script                                 | npm alias                        |
+| ---------------------------------------------- | -------------------------------------- | -------------------------------- |
+| Add a new node                                 | `./scripts/add-node.sh`                | `npm run node:add --`            |
+| Replace a node body while preserving its title | `./scripts/edit-node-content.sh`       | `npm run node:edit --`           |
+| Read a node                                    | `./scripts/get-node-content.sh`        | `npm run node:get --`            |
+| Search titles                                  | `./scripts/search-nodes-by-title.sh`   | `npm run node:search:title --`   |
+| Search bodies                                  | `./scripts/search-nodes-by-content.sh` | `npm run node:search:content --` |
+| Verify `[[Wiki Links]]` resolve                | `./scripts/check-node-links.sh`        | `npm run node:check-links`       |
 
 ## Node Graph Shape
 
@@ -153,7 +153,9 @@ Poor granularity:
 
 ```markdown
 # Export Button Component
+
 # Export Route Handler
+
 # Export Test Command
 
 These nodes describe pieces of one feature without preserving a separate durable decision or architectural contract.
@@ -163,16 +165,16 @@ These nodes describe pieces of one feature without preserving a separate durable
 
 Read the conversation and classify information into buckets before writing files:
 
-| Bucket | What to capture | Example node title |
-| --- | --- | --- |
-| Overview | What the conversation accomplished | `Conversation Summary - Node Skill` |
-| Goals | Desired outcome and success criteria | `Conversation Node Skill Goals` |
-| Decisions | Chosen direction and rationale | `Node Summarization Decisions` |
-| Constraints | Boundaries, preferences, non-goals | `Concise Agent Communication` |
-| Workflow | Repeatable process | `Conversation To Node Workflow` |
-| Artifacts | Files, scripts, commands, outputs | `Node Script Usage` |
-| Actions | Follow-ups with owners or triggers | `Conversation Follow-up Actions` |
-| Questions | Unknowns or deferred choices | `Open Questions From Conversation` |
+| Bucket      | What to capture                      | Example node title                  |
+| ----------- | ------------------------------------ | ----------------------------------- |
+| Overview    | What the conversation accomplished   | `Conversation Summary - Node Skill` |
+| Goals       | Desired outcome and success criteria | `Conversation Node Skill Goals`     |
+| Decisions   | Chosen direction and rationale       | `Node Summarization Decisions`      |
+| Constraints | Boundaries, preferences, non-goals   | `Concise Agent Communication`       |
+| Workflow    | Repeatable process                   | `Conversation To Node Workflow`     |
+| Artifacts   | Files, scripts, commands, outputs    | `Node Script Usage`                 |
+| Actions     | Follow-ups with owners or triggers   | `Conversation Follow-up Actions`    |
+| Questions   | Unknowns or deferred choices         | `Open Questions From Conversation`  |
 
 When the conversation includes code, commands, paths, URLs, or diagrams, preserve them only when they help future work. Summarize logs; do not paste long output unless the exact output is important evidence.
 

@@ -388,6 +388,13 @@ fn start_node_watcher(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Er
 }
 
 fn resolve_nodes_dir() -> Result<PathBuf, String> {
+    if let Ok(nodes_dir) = env::var("AG_NODES_DIR") {
+        let path = PathBuf::from(nodes_dir);
+        if path.is_dir() {
+            return Ok(path);
+        }
+    }
+
     if let Ok(nodes_dir) = env::var("NODE_GRAPH_DIR") {
         let path = PathBuf::from(nodes_dir);
         if path.is_dir() {
@@ -396,6 +403,10 @@ fn resolve_nodes_dir() -> Result<PathBuf, String> {
     }
 
     let mut candidates = Vec::new();
+
+    if let Ok(home) = env::var("HOME") {
+        candidates.push(PathBuf::from(home).join(".local/share/agentgraph/nodes"));
+    }
 
     if let Ok(current_dir) = env::current_dir() {
         candidates.push(current_dir.join("nodes"));
@@ -417,9 +428,7 @@ fn resolve_nodes_dir() -> Result<PathBuf, String> {
     candidates
         .into_iter()
         .find(|path| path.is_dir())
-        .ok_or_else(|| {
-            "Could not find nodes directory. Set NODE_GRAPH_DIR to override.".to_string()
-        })
+        .ok_or_else(|| "Could not find nodes directory. Set AG_NODES_DIR to override.".to_string())
 }
 
 fn is_markdown_file(path: &Path) -> bool {

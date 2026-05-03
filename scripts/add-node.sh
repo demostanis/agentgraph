@@ -23,7 +23,7 @@ if [ -z "$slug" ]; then
   exit 1
 fi
 
-nodes_dir="nodes"
+nodes_dir="${AG_NODES_DIR:-$HOME/.local/share/agentgraph/nodes}"
 node_file="$nodes_dir/$slug.md"
 
 mkdir -p "$nodes_dir"

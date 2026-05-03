@@ -7,7 +7,7 @@ usage() {
   printf 'If content is omitted, reads stdin when piped or opens $EDITOR.\n' >&2
 }
 
-nodes_dir="nodes"
+nodes_dir="${AG_NODES_DIR:-$HOME/.local/share/agentgraph/nodes}"
 
 if [ "$#" -eq 0 ]; then
   usage

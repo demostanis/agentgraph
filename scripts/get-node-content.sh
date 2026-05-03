@@ -6,7 +6,7 @@ usage() {
   printf 'Prints node markdown content. By default the leading # title is omitted.\n' >&2
 }
 
-nodes_dir="nodes"
+nodes_dir="${AG_NODES_DIR:-$HOME/.local/share/agentgraph/nodes}"
 with_title=0
 
 while [ "$#" -gt 0 ]; do

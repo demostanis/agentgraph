@@ -3,7 +3,7 @@
 pkgname=agentgraph-git
 _pkgname=agentgraph
 _binname=d3-force-three-renderer
-pkgver=0.1.0.r34.ga87a92d
+pkgver=0.1.0.r33.gea5cfcf
 pkgrel=1
 pkgdesc='Desktop viewer for agent produced memory nodes'
 arch=('x86_64')
@@ -39,6 +39,10 @@ pkgver() {
 
 prepare() {
   cd "${_pkgname}"
+
+  cp -a "${startdir}/../../scripts" .
+  cp -a "${startdir}/../../.agents" .
+  cp -a "${startdir}/../../src-tauri/src/lib.rs" src-tauri/src/lib.rs
 
   export npm_config_cache="${srcdir}/npm-cache"
   npm ci
@@ -79,13 +83,13 @@ package() {
   install -dm755 "${pkgdir}/usr/bin"
   cat > "${pkgdir}/usr/bin/${_pkgname}" <<'EOF'
 #!/bin/sh
-if [ -z "${NODE_GRAPH_DIR}" ]; then
+if [ -z "${AG_NODES_DIR}" ]; then
   : "${XDG_DATA_HOME:=${HOME}/.local/share}"
-  NODE_GRAPH_DIR="${XDG_DATA_HOME}/agentgraph/nodes"
+  AG_NODES_DIR="${XDG_DATA_HOME}/agentgraph/nodes"
 fi
 
-mkdir -p "${NODE_GRAPH_DIR}"
-export NODE_GRAPH_DIR
+mkdir -p "${AG_NODES_DIR}"
+export AG_NODES_DIR
 exec /usr/lib/agentgraph/d3-force-three-renderer "$@"
 EOF
   chmod 755 "${pkgdir}/usr/bin/${_pkgname}"

@@ -55,7 +55,7 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 1
 fi
 
-nodes_dir="nodes"
+nodes_dir="${AG_NODES_DIR:-$HOME/.local/share/agentgraph/nodes}"
 query=$*
 
 if [ ! -d "$nodes_dir" ]; then
