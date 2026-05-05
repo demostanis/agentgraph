@@ -1,17 +1,20 @@
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use serde::Serialize;
 use serde_json::Value;
 use std::{
     collections::HashMap,
     env, fs, io,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
     sync::Mutex,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
 
 const NODES_CHANGED_EVENT: &str = "nodes://changed";
+const LINK_PREVIEW_USER_AGENT: &str = "AgentGraph/0.1 link-preview";
+const MAX_LINK_PREVIEW_CHARS: usize = 200_000;
 
 struct NodeWatcher(Mutex<Option<RecommendedWatcher>>);
 
@@ -33,6 +36,17 @@ struct NodeSearchResult {
     match_kind: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LinkPreview {
+    url: String,
+    host: String,
+    title: Option<String>,
+    description: Option<String>,
+    image: Option<String>,
+    site_name: Option<String>,
+}
+
 struct NodeSearchCandidate {
     result: NodeSearchResult,
     markdown: String,
@@ -46,6 +60,8 @@ pub fn run() {
         .manage(NodeWatcher(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             delete_node_file,
+            fetch_link_preview,
+            open_external_url,
             read_node_files,
             search_nodes
         ])
@@ -144,6 +160,298 @@ fn search_nodes(query: String) -> Result<Vec<NodeSearchResult>, String> {
     }
 
     parse_rg_search_results(&output.stdout, query)
+}
+
+#[tauri::command]
+async fn fetch_link_preview(url: String) -> Result<LinkPreview, String> {
+    let parsed_url = parse_external_url(&url)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build()
+        .map_err(|error| format!("Could not create preview client: {error}"))?;
+    let response = client
+        .get(parsed_url.clone())
+        .header(USER_AGENT, LINK_PREVIEW_USER_AGENT)
+        .send()
+        .await
+        .map_err(|error| format!("Could not fetch preview: {error}"))?;
+    let status = response.status();
+    let final_url = response.url().clone();
+    let host = final_url.host_str().unwrap_or_default().to_string();
+    let content_type = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if !status.is_success() {
+        return Err(format!("Preview request failed with status {status}."));
+    }
+
+    if !content_type.is_empty() && !content_type.contains("text/html") {
+        return Ok(LinkPreview {
+            url: final_url.to_string(),
+            host,
+            title: None,
+            description: None,
+            image: None,
+            site_name: None,
+        });
+    }
+
+    let html = response
+        .text()
+        .await
+        .map_err(|error| format!("Could not read preview response: {error}"))?;
+    let html = html
+        .chars()
+        .take(MAX_LINK_PREVIEW_CHARS)
+        .collect::<String>();
+    let title = first_preview_value(vec![
+        extract_meta_content(&html, "property", &["og:title"]),
+        extract_meta_content(&html, "name", &["twitter:title"]),
+        extract_title(&html),
+    ]);
+    let description = first_preview_value(vec![
+        extract_meta_content(&html, "property", &["og:description"]),
+        extract_meta_content(&html, "name", &["twitter:description"]),
+        extract_meta_content(&html, "name", &["description"]),
+    ]);
+    let image = first_preview_value(vec![
+        extract_meta_content(
+            &html,
+            "property",
+            &["og:image", "og:image:url", "og:image:secure_url"],
+        ),
+        extract_meta_content(&html, "name", &["twitter:image", "twitter:image:src"]),
+    ])
+    .and_then(|image_url| resolve_preview_url(&final_url, &image_url));
+    let site_name = first_preview_value(vec![
+        extract_meta_content(&html, "property", &["og:site_name"]),
+        extract_meta_content(&html, "name", &["application-name"]),
+    ]);
+
+    Ok(LinkPreview {
+        url: final_url.to_string(),
+        host,
+        title,
+        description,
+        image,
+        site_name,
+    })
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let parsed_url = parse_external_url(&url)?;
+    open_url_with_system(parsed_url.as_str())
+        .map_err(|error| format!("Could not open default browser: {error}"))
+}
+
+fn parse_external_url(url: &str) -> Result<reqwest::Url, String> {
+    let parsed_url = reqwest::Url::parse(url.trim())
+        .map_err(|error| format!("Invalid external URL: {error}"))?;
+
+    if !matches!(parsed_url.scheme(), "http" | "https") {
+        return Err("Only http and https links can be opened.".to_string());
+    }
+
+    Ok(parsed_url)
+}
+
+#[cfg(target_os = "macos")]
+fn open_url_with_system(url: &str) -> io::Result<()> {
+    Command::new("open")
+        .arg(url)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+}
+
+#[cfg(target_os = "windows")]
+fn open_url_with_system(url: &str) -> io::Result<()> {
+    Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn open_url_with_system(url: &str) -> io::Result<()> {
+    Command::new("xdg-open")
+        .arg(url)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .or_else(|_| {
+            Command::new("gio")
+                .args(["open", url])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+        })
+        .map(|_| ())
+}
+
+fn first_preview_value(values: Vec<Option<String>>) -> Option<String> {
+    values
+        .into_iter()
+        .flatten()
+        .find(|value| !value.trim().is_empty())
+}
+
+fn extract_meta_content(html: &str, attr_name: &str, attr_values: &[&str]) -> Option<String> {
+    let lower_html = html.to_ascii_lowercase();
+    let mut search_start = 0;
+
+    while let Some(relative_start) = lower_html[search_start..].find("<meta") {
+        let tag_start = search_start + relative_start;
+        let Some(relative_end) = lower_html[tag_start..].find('>') else {
+            break;
+        };
+        let tag_end = tag_start + relative_end + 1;
+        let tag = &html[tag_start..tag_end];
+        let Some(value) = get_attr(tag, attr_name) else {
+            search_start = tag_end;
+            continue;
+        };
+
+        if attr_values
+            .iter()
+            .any(|attr_value| value.eq_ignore_ascii_case(attr_value))
+        {
+            return get_attr(tag, "content");
+        }
+
+        search_start = tag_end;
+    }
+
+    None
+}
+
+fn extract_title(html: &str) -> Option<String> {
+    let lower_html = html.to_ascii_lowercase();
+    let title_start = lower_html.find("<title")?;
+    let content_start = title_start + lower_html[title_start..].find('>')? + 1;
+    let content_end = content_start + lower_html[content_start..].find("</title>")?;
+    clean_preview_text(&html[content_start..content_end])
+}
+
+fn get_attr(tag: &str, attr_name: &str) -> Option<String> {
+    let bytes = tag.as_bytes();
+    let mut index = 0;
+
+    while index < bytes.len() {
+        while index < bytes.len() && !is_attr_name_byte(bytes[index]) {
+            index += 1;
+        }
+
+        let name_start = index;
+
+        while index < bytes.len() && is_attr_name_byte(bytes[index]) {
+            index += 1;
+        }
+
+        if name_start == index {
+            break;
+        }
+
+        let name = &tag[name_start..index];
+
+        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+
+        if index >= bytes.len() || bytes[index] != b'=' {
+            continue;
+        }
+
+        index += 1;
+
+        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+
+        if index >= bytes.len() {
+            break;
+        }
+
+        let (value_start, value_end) = if matches!(bytes[index], b'\'' | b'"') {
+            let quote = bytes[index];
+            index += 1;
+            let value_start = index;
+
+            while index < bytes.len() && bytes[index] != quote {
+                index += 1;
+            }
+
+            let value_end = index;
+
+            if index < bytes.len() {
+                index += 1;
+            }
+
+            (value_start, value_end)
+        } else {
+            let value_start = index;
+
+            while index < bytes.len() && !bytes[index].is_ascii_whitespace() && bytes[index] != b'>'
+            {
+                index += 1;
+            }
+
+            (value_start, index)
+        };
+
+        if name.eq_ignore_ascii_case(attr_name) {
+            return clean_preview_text(&tag[value_start..value_end]);
+        }
+    }
+
+    None
+}
+
+fn is_attr_name_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'-' | b'_')
+}
+
+fn clean_preview_text(value: &str) -> Option<String> {
+    let decoded = decode_html_entities(value);
+    let compact = decoded.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    if compact.is_empty() {
+        None
+    } else {
+        Some(compact)
+    }
+}
+
+fn decode_html_entities(value: &str) -> String {
+    value
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#34;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#x27;", "'")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&nbsp;", " ")
+}
+
+fn resolve_preview_url(base_url: &reqwest::Url, value: &str) -> Option<String> {
+    let resolved = base_url.join(value.trim()).ok()?;
+
+    if matches!(resolved.scheme(), "http" | "https") {
+        Some(resolved.to_string())
+    } else {
+        None
+    }
 }
 
 fn parse_rg_search_results(stdout: &[u8], query: &str) -> Result<Vec<NodeSearchResult>, String> {
