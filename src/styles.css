@@ -1415,6 +1415,94 @@ body {
   background: linear-gradient(90deg, rgba(168, 85, 247, 0.48), rgba(76, 201, 240, 0.08));
 }
 
+.node-content .node-references {
+  margin-top: 28px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(168, 85, 247, 0.14), transparent 46%),
+    rgba(255, 255, 255, 0.045);
+}
+
+.node-content .node-references__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 15px;
+  appearance: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font: inherit;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-align: left;
+  text-transform: uppercase;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.node-content .node-references__toggle:hover,
+.node-content .node-references__toggle:focus-visible {
+  background: rgba(255, 255, 255, 0.075);
+  color: #ffffff;
+  outline: none;
+}
+
+.node-content .node-references__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  transition: transform 180ms ease;
+}
+
+.node-content .node-references.is-expanded .node-references__icon {
+  transform: rotate(180deg);
+}
+
+.node-content .node-references__label {
+  flex: 1 1 auto;
+}
+
+.node-content .node-references__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid rgba(216, 199, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.16);
+  color: rgba(228, 234, 255, 0.86);
+  font-size: 0.68rem;
+  letter-spacing: 0;
+}
+
+.node-content .node-references__body {
+  padding: 4px 12px 10px 40px;
+}
+
+.node-content .node-references__body[hidden] {
+  display: none;
+}
+
+.node-content .node-references ul {
+  margin: 8px 0 0;
+  padding-left: 1rem;
+}
+
+.node-content .node-references li + li {
+  margin-top: 7px;
+}
+
 .node-content strong {
   color: #ffffff;
 }

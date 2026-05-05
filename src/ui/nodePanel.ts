@@ -67,7 +67,8 @@ export class NodePanel {
     this.hideDeleteConfirm();
     this.deleteButton.disabled = false;
     this.deleteButton.setAttribute("aria-label", `Delete ${node.label}`);
-    this.content.innerHTML = renderMarkdown(createNodeMarkdown(node, backlinkNodes));
+    this.content.innerHTML = renderMarkdown(createNodeMarkdown(node));
+    this.appendReferencedBySection(backlinkNodes);
     this.prepareExternalLinks();
     this.panel.classList.add("is-visible");
     this.backButton.classList.add("is-visible");
@@ -167,6 +168,14 @@ export class NodePanel {
 
   private handleContentClick = (event: MouseEvent): void => {
     const target = event.target as HTMLElement | null;
+    const referencesToggle = target?.closest<HTMLButtonElement>("button[data-node-references-toggle]");
+
+    if (referencesToggle) {
+      event.preventDefault();
+      this.toggleReferencedBy(referencesToggle);
+      return;
+    }
+
     const externalLink = target?.closest<HTMLAnchorElement>("a[data-external-link]");
 
     if (externalLink) {
@@ -193,6 +202,28 @@ export class NodePanel {
       this.callbacks.onNodeLinkClick?.(title);
     }
   };
+
+  private appendReferencedBySection(backlinkNodes: GraphNode[]): void {
+    if (backlinkNodes.length === 0) {
+      return;
+    }
+
+    this.content.append(createReferencedBySection(backlinkNodes));
+  }
+
+  private toggleReferencedBy(toggle: HTMLButtonElement): void {
+    const section = toggle.closest<HTMLElement>(".node-references");
+    const body = section?.querySelector<HTMLElement>(".node-references__body");
+    const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+    const nextExpanded = !isExpanded;
+
+    toggle.setAttribute("aria-expanded", String(nextExpanded));
+    section?.classList.toggle("is-expanded", nextExpanded);
+
+    if (body) {
+      body.hidden = !nextExpanded;
+    }
+  }
 
   private prepareExternalLinks(): void {
     Array.from(this.content.querySelectorAll<HTMLAnchorElement>("a[data-external-link]")).forEach((link) => {
@@ -432,6 +463,68 @@ function createLinkPreviewElement(): HTMLDivElement {
   return preview;
 }
 
+let referencedBySectionId = 0;
+
+function createReferencedBySection(backlinkNodes: GraphNode[]): HTMLElement {
+  const section = document.createElement("section");
+  const toggle = document.createElement("button");
+  const label = document.createElement("span");
+  const count = document.createElement("span");
+  const body = document.createElement("div");
+  const list = document.createElement("ul");
+  const bodyId = `node-references-${++referencedBySectionId}`;
+
+  section.className = "node-references";
+  toggle.className = "node-references__toggle";
+  toggle.type = "button";
+  toggle.dataset.nodeReferencesToggle = "";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-controls", bodyId);
+  label.className = "node-references__label";
+  label.textContent = "Referenced by";
+  count.className = "node-references__count";
+  count.textContent = String(backlinkNodes.length);
+  body.id = bodyId;
+  body.className = "node-references__body";
+  body.hidden = true;
+
+  backlinkNodes.forEach((backlinkNode) => {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+
+    link.href = "#";
+    link.dataset.nodeLink = backlinkNode.label;
+    link.textContent = backlinkNode.label;
+    item.append(link);
+    list.append(item);
+  });
+
+  toggle.append(createChevronDownIcon(), label, count);
+  body.append(list);
+  section.append(toggle, body);
+  return section;
+}
+
+function createChevronDownIcon(): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+
+  svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  svg.setAttribute("width", "24");
+  svg.setAttribute("height", "24");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("class", "node-references__icon lucide lucide-chevron-down");
+  svg.setAttribute("aria-hidden", "true");
+  path.setAttribute("d", "m6 9 6 6 6-6");
+  svg.append(path);
+  return svg;
+}
+
 function createPreviewSkeleton(className: string): HTMLDivElement {
   const skeleton = document.createElement("div");
   skeleton.className = `${className} link-preview__skeleton`;
@@ -574,18 +667,6 @@ function loadMermaid(): Promise<Mermaid> {
   return mermaidLoader;
 }
 
-function createNodeMarkdown(node: GraphNode, backlinkNodes: GraphNode[]): string {
-  const backlinks = backlinkNodes.map((backlinkNode) => `- [[${backlinkNode.label}]]`).join("\n");
-
-  if (!backlinks) {
-    return node.markdown.trim();
-  }
-
-  return `
-${node.markdown.trim()}
-
-## Referenced by
-
-${backlinks}
-`.trim();
+function createNodeMarkdown(node: GraphNode): string {
+  return node.markdown.trim();
 }
