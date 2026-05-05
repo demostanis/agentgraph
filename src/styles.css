@@ -1913,8 +1913,7 @@ body {
   backdrop-filter: blur(16px);
 }
 
-.node-content .mermaid-diagram.is-rendered.is-controls-visible .mermaid-zoom-controls,
-.node-content .mermaid-diagram.is-rendered:focus-within .mermaid-zoom-controls {
+.node-content .mermaid-diagram.is-rendered.is-controls-visible .mermaid-zoom-controls {
   opacity: 1;
   pointer-events: auto;
   transform: none;
