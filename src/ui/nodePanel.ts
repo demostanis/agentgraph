@@ -15,6 +15,11 @@ type LinkPreview = {
 
 const LINK_PREVIEW_WIDTH = 320;
 const LINK_PREVIEW_HEIGHT = 214;
+const MERMAID_MIN_ZOOM = 0.5;
+const MERMAID_MAX_ZOOM = 3;
+const MERMAID_ZOOM_STEP = 0.25;
+const MERMAID_WHEEL_ZOOM_FACTOR = 1.12;
+const MERMAID_CONTROLS_HIDE_DELAY = 1000;
 
 type NodePanelCallbacks = {
   onNodeDelete?: (node: GraphNode) => void;
@@ -440,9 +445,15 @@ export class NodePanel {
       }
 
       await mermaid.run({ nodes: diagrams });
+
+      if (renderId !== this.renderId) {
+        return;
+      }
+
       containers.forEach((container) => {
         container.classList.add("is-rendered");
         container.setAttribute("aria-busy", "false");
+        initializeMermaidZoom(container);
       });
     } catch (error) {
       containers.forEach((container) => {
@@ -452,6 +463,293 @@ export class NodePanel {
       });
     }
   }
+}
+
+type MermaidZoomState = {
+  zoom: number;
+  baseWidth: number;
+  baseHeight: number;
+};
+
+type MermaidZoomAnchor = {
+  contentX: number;
+  contentY: number;
+  viewportX: number;
+  viewportY: number;
+};
+
+type MermaidPanState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  scrollLeft: number;
+  scrollTop: number;
+};
+
+type MermaidZoomControls = {
+  element: HTMLDivElement;
+  zoomOutButton: HTMLButtonElement;
+  resetButton: HTMLButtonElement;
+  zoomInButton: HTMLButtonElement;
+};
+
+function initializeMermaidZoom(container: HTMLElement): void {
+  if (container.dataset.mermaidZoomReady === "true") {
+    return;
+  }
+
+  const viewport = container.querySelector<HTMLElement>(".mermaid-diagram__viewport");
+  const diagram = container.querySelector<HTMLElement>(".mermaid");
+  const svg = diagram?.querySelector<SVGSVGElement>("svg");
+
+  if (!viewport || !diagram || !svg) {
+    return;
+  }
+
+  const state: MermaidZoomState = {
+    zoom: 1,
+    baseWidth: 0,
+    baseHeight: 0,
+  };
+  const controls = createMermaidZoomControls();
+  let panState: MermaidPanState | null = null;
+  let controlsHideTimeout = 0;
+
+  container.dataset.mermaidZoomReady = "true";
+  container.classList.add("is-zoomable");
+  measureMermaidBase(svg, state);
+  updateMermaidZoomControls(controls, state);
+  container.append(controls.element);
+
+  const setZoom = (nextZoom: number, anchor?: MermaidZoomAnchor): void => {
+    const zoom = clampMermaidZoom(nextZoom);
+
+    if (zoom === state.zoom) {
+      return;
+    }
+
+    const previousZoom = state.zoom;
+    const zoomAnchor = anchor ?? createCenteredMermaidZoomAnchor(viewport);
+
+    if (previousZoom === 1) {
+      measureMermaidBase(svg, state);
+    }
+
+    state.zoom = zoom;
+    applyMermaidZoom(svg, state);
+    updateMermaidZoomControls(controls, state);
+    preserveMermaidZoomAnchor(viewport, zoomAnchor, previousZoom, state.zoom);
+  };
+
+  const hideControls = (): void => {
+    window.clearTimeout(controlsHideTimeout);
+    controlsHideTimeout = 0;
+    container.classList.remove("is-controls-visible");
+  };
+
+  const showControls = (): void => {
+    container.classList.add("is-controls-visible");
+    window.clearTimeout(controlsHideTimeout);
+    controlsHideTimeout = window.setTimeout(hideControls, MERMAID_CONTROLS_HIDE_DELAY);
+  };
+
+  controls.zoomOutButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    setZoom(state.zoom - MERMAID_ZOOM_STEP);
+  });
+  controls.resetButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    setZoom(1);
+  });
+  controls.zoomInButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    setZoom(state.zoom + MERMAID_ZOOM_STEP);
+  });
+
+  viewport.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      showControls();
+      const factor = event.deltaY < 0 ? MERMAID_WHEEL_ZOOM_FACTOR : 1 / MERMAID_WHEEL_ZOOM_FACTOR;
+      setZoom(state.zoom * factor, createPointerMermaidZoomAnchor(viewport, event));
+    },
+    { passive: false },
+  );
+
+  viewport.addEventListener("keydown", (event) => {
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      setZoom(state.zoom + MERMAID_ZOOM_STEP);
+    } else if (event.key === "-" || event.key === "_") {
+      event.preventDefault();
+      setZoom(state.zoom - MERMAID_ZOOM_STEP);
+    } else if (event.key === "0") {
+      event.preventDefault();
+      setZoom(1);
+    }
+  });
+
+  viewport.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || event.pointerType === "touch" || isMermaidZoomControlTarget(event.target)) {
+      return;
+    }
+
+    showControls();
+    panState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+    };
+    viewport.setPointerCapture(event.pointerId);
+    container.classList.add("is-panning");
+  });
+
+  viewport.addEventListener("pointermove", (event) => {
+    if (!panState || panState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - panState.startX;
+    const deltaY = event.clientY - panState.startY;
+
+    if (Math.abs(deltaX) + Math.abs(deltaY) > 2) {
+      event.preventDefault();
+    }
+
+    viewport.scrollLeft = panState.scrollLeft - deltaX;
+    viewport.scrollTop = panState.scrollTop - deltaY;
+  });
+
+  container.addEventListener("mouseenter", showControls);
+  container.addEventListener("mousemove", showControls);
+  container.addEventListener("mouseleave", hideControls);
+
+  const finishPan = (event: PointerEvent): void => {
+    if (!panState || panState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (viewport.hasPointerCapture(event.pointerId)) {
+      viewport.releasePointerCapture(event.pointerId);
+    }
+
+    panState = null;
+    container.classList.remove("is-panning");
+  };
+
+  viewport.addEventListener("pointerup", finishPan);
+  viewport.addEventListener("pointercancel", finishPan);
+  viewport.addEventListener("lostpointercapture", finishPan);
+}
+
+function createMermaidZoomControls(): MermaidZoomControls {
+  const element = document.createElement("div");
+  const zoomOutButton = createMermaidZoomButton("-", "Zoom Mermaid diagram out");
+  const resetButton = createMermaidZoomButton("100%", "Reset Mermaid diagram zoom");
+  const zoomInButton = createMermaidZoomButton("+", "Zoom Mermaid diagram in");
+
+  element.className = "mermaid-zoom-controls";
+  element.setAttribute("aria-label", "Mermaid zoom controls");
+  resetButton.classList.add("mermaid-zoom-button--value");
+  element.append(zoomOutButton, resetButton, zoomInButton);
+
+  return {
+    element,
+    zoomOutButton,
+    resetButton,
+    zoomInButton,
+  };
+}
+
+function createMermaidZoomButton(label: string, ariaLabel: string): HTMLButtonElement {
+  const button = document.createElement("button");
+
+  button.type = "button";
+  button.className = "mermaid-zoom-button";
+  button.textContent = label;
+  button.setAttribute("aria-label", ariaLabel);
+  return button;
+}
+
+function updateMermaidZoomControls(controls: MermaidZoomControls, state: MermaidZoomState): void {
+  const percent = Math.round(state.zoom * 100);
+
+  controls.zoomOutButton.disabled = state.zoom <= MERMAID_MIN_ZOOM;
+  controls.zoomInButton.disabled = state.zoom >= MERMAID_MAX_ZOOM;
+  controls.resetButton.textContent = `${percent}%`;
+  controls.resetButton.setAttribute("aria-label", `Reset Mermaid diagram zoom to 100%. Current zoom is ${percent}%.`);
+}
+
+function measureMermaidBase(svg: SVGSVGElement, state: MermaidZoomState): void {
+  const rect = svg.getBoundingClientRect();
+  const viewBox = svg.viewBox.baseVal;
+  const width = rect.width || viewBox.width || getSvgNumberAttribute(svg, "width");
+  const height = rect.height || viewBox.height || getSvgNumberAttribute(svg, "height");
+
+  state.baseWidth = Math.max(1, width / state.zoom);
+  state.baseHeight = Math.max(1, height / state.zoom);
+}
+
+function applyMermaidZoom(svg: SVGSVGElement, state: MermaidZoomState): void {
+  if (state.zoom === 1) {
+    svg.style.width = "";
+    svg.style.height = "";
+    svg.style.maxWidth = "";
+    return;
+  }
+
+  svg.style.width = `${state.baseWidth * state.zoom}px`;
+  svg.style.height = `${state.baseHeight * state.zoom}px`;
+  svg.style.maxWidth = "none";
+}
+
+function createCenteredMermaidZoomAnchor(viewport: HTMLElement): MermaidZoomAnchor {
+  return {
+    contentX: viewport.scrollLeft + viewport.clientWidth / 2,
+    contentY: viewport.scrollTop + viewport.clientHeight / 2,
+    viewportX: viewport.clientWidth / 2,
+    viewportY: viewport.clientHeight / 2,
+  };
+}
+
+function createPointerMermaidZoomAnchor(viewport: HTMLElement, event: WheelEvent): MermaidZoomAnchor {
+  const rect = viewport.getBoundingClientRect();
+  const viewportX = event.clientX - rect.left;
+  const viewportY = event.clientY - rect.top;
+
+  return {
+    contentX: viewport.scrollLeft + viewportX,
+    contentY: viewport.scrollTop + viewportY,
+    viewportX,
+    viewportY,
+  };
+}
+
+function preserveMermaidZoomAnchor(viewport: HTMLElement, anchor: MermaidZoomAnchor, previousZoom: number, nextZoom: number): void {
+  window.requestAnimationFrame(() => {
+    viewport.scrollLeft = (anchor.contentX / previousZoom) * nextZoom - anchor.viewportX;
+    viewport.scrollTop = (anchor.contentY / previousZoom) * nextZoom - anchor.viewportY;
+  });
+}
+
+function clampMermaidZoom(zoom: number): number {
+  const clamped = Math.min(MERMAID_MAX_ZOOM, Math.max(MERMAID_MIN_ZOOM, zoom));
+
+  return Math.round(clamped * 100) / 100;
+}
+
+function getSvgNumberAttribute(svg: SVGSVGElement, name: string): number {
+  const value = svg.getAttribute(name);
+  const number = value ? Number.parseFloat(value) : 0;
+
+  return Number.isFinite(number) ? number : 0;
+}
+
+function isMermaidZoomControlTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(".mermaid-zoom-controls"));
 }
 
 function createLinkPreviewElement(): HTMLDivElement {

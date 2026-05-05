@@ -63,7 +63,7 @@ function configureRenderer(md: MarkdownIt): void {
 
     if (language === "mermaid") {
       const code = md.utils.escapeHtml(token.content);
-      return `<div class="mermaid-diagram" aria-busy="true"><div class="mermaid">${code}</div><div class="mermaid-loading" aria-hidden="true"><span></span></div></div>`;
+      return `<div class="mermaid-diagram" aria-busy="true"><div class="mermaid-diagram__viewport" tabindex="0" aria-label="Zoomable Mermaid diagram. Use mouse scroll, zoom controls, or drag to pan."><div class="mermaid">${code}</div></div><div class="mermaid-loading" aria-hidden="true"><span></span></div></div>`;
     }
 
     return defaultFence?.(tokens, idx, options, env, self) ?? self.renderToken(tokens, idx, options);

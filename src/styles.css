@@ -1831,21 +1831,51 @@ body {
 
 .node-content .mermaid-diagram {
   position: relative;
-  display: grid;
-  place-items: center;
   min-height: 180px;
-  overflow: auto;
+  overflow: hidden;
   max-width: 100%;
   margin: 18px 0 22px;
-  padding: 18px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.24);
   color: rgba(228, 234, 255, 0.86);
+}
+
+.node-content .mermaid-diagram__viewport {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  max-width: 100%;
+  overflow: auto;
+  padding: 18px;
+  border-radius: inherit;
+  outline: none;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  touch-action: pan-x pan-y;
+}
+
+.node-content .mermaid-diagram__viewport:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(76, 201, 240, 0.72);
+}
+
+.node-content .mermaid-diagram.is-zoomable .mermaid-diagram__viewport {
+  cursor: grab;
+}
+
+.node-content .mermaid-diagram.is-panning .mermaid-diagram__viewport {
+  cursor: grabbing;
+}
+
+.node-content .mermaid-diagram.is-panning,
+.node-content .mermaid-diagram.is-panning * {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .node-content .mermaid {
+  display: inline-block;
+  line-height: 0;
   opacity: 0;
   transition: opacity 180ms ease;
 }
@@ -1855,8 +1885,88 @@ body {
 }
 
 .node-content .mermaid svg {
+  display: block;
   max-width: 100%;
   height: auto;
+}
+
+.node-content .mermaid-zoom-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(8, 10, 28, 0.82);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.node-content .mermaid-diagram.is-rendered.is-controls-visible .mermaid-zoom-controls,
+.node-content .mermaid-diagram.is-rendered:focus-within .mermaid-zoom-controls {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.node-content .mermaid-zoom-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font: inherit;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  touch-action: manipulation;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.node-content .mermaid-zoom-button--value {
+  min-width: 50px;
+  background: rgba(76, 201, 240, 0.16);
+  color: #ffffff;
+  font-size: 0.62rem;
+}
+
+.node-content .mermaid-zoom-button:hover,
+.node-content .mermaid-zoom-button:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.node-content .mermaid-zoom-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  transform: none;
 }
 
 .node-content .mermaid-loading {
@@ -2068,6 +2178,9 @@ body {
   .node-search__results,
   .node-search__result,
   .node-search__toggle,
+  .node-content .mermaid,
+  .node-content .mermaid-zoom-controls,
+  .node-content .mermaid-zoom-button,
   .link-preview,
   .time-filter__range-stack,
   .time-filter__toggle svg,
