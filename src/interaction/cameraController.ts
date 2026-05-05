@@ -129,7 +129,7 @@ export class CameraController {
     const fitZoom = Math.min(availableWidth / graphWidth, availableHeight / graphHeight);
 
     this.targetPosition.set((bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2);
-    this.targetZoom = THREE.MathUtils.clamp(fitZoom, CAMERA_CONFIG.minZoom, CAMERA_CONFIG.maxZoom);
+    this.targetZoom = THREE.MathUtils.clamp(fitZoom, CAMERA_CONFIG.minZoom, CAMERA_CONFIG.maxFitZoom);
   }
 
   panByWorldDelta(deltaX: number, deltaY: number): void {

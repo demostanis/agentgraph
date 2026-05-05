@@ -1,23 +1,28 @@
 import type { Cluster } from "../types";
 
 export const CLUSTERS: Cluster[] = [
-  { name: "Signals", x: -650, y: -230 },
-  { name: "Models", x: -330, y: 290 },
-  { name: "Pipelines", x: 40, y: -300 },
-  { name: "Products", x: 420, y: 280 },
-  { name: "Ops", x: 720, y: -150 },
-  { name: "Archives", x: -840, y: 280 },
+  { name: "Core", x: 0, y: 0 },
+  { name: "Northwest", x: -1350, y: -680 },
+  { name: "Northeast", x: 1350, y: -680 },
+  { name: "Southeast", x: 1350, y: 680 },
+  { name: "Southwest", x: -1350, y: 680 },
+  { name: "South", x: 0, y: 1320 },
 ];
+
+export const COMPONENT_ANCHOR_CONFIG = {
+  fallbackRadius: 1720,
+  fallbackRingGap: 720,
+} as const;
 
 export const NODE_COLOR_HEX = "#ffffff";
 export const ACCENT_COLOR_HEX = "#a855f7";
 
 export const CAMERA_CONFIG = {
-  fitWidth: 2300,
-  fitHeight: 1200,
-  minFitZoom: 0.45,
-  maxFitZoom: 1.15,
-  minZoom: 0.32,
+  fitWidth: 3100,
+  fitHeight: 1700,
+  minFitZoom: 0.28,
+  maxFitZoom: 0.9,
+  minZoom: 0.2,
   maxZoom: 4.5,
   selectedZoom: 1.45,
   hoverPreviewZoom: 1.08,
@@ -27,20 +32,44 @@ export const CAMERA_CONFIG = {
 } as const;
 
 export const SIMULATION_CONFIG = {
-  crossClusterMinDistance: 560,
-  crossClusterDistanceScale: 2.35,
-  sameClusterLinkStrengthBase: 0.05,
-  sameClusterLinkStrengthScale: 0.045,
-  crossClusterLinkStrength: 0.0035,
-  chargeBase: -98,
-  chargeRadiusScale: -5,
-  chargeDistanceMax: 390,
-  collisionPadding: 7,
+  linkDistance: 145,
+  linkIterations: 3,
+  initialClusterSpreadBase: 74,
+  initialClusterSpreadRange: 112,
+  crossClusterMinDistance: 820,
+  crossClusterDistanceScale: 3.1,
+  sameClusterLinkStrengthBase: 0.035,
+  sameClusterLinkStrengthScale: 0.025,
+  crossClusterLinkStrength: 0.0015,
+  chargeBase: -142,
+  chargeRadiusScale: -5.6,
+  chargeDistanceMax: 620,
+  collisionPadding: 12,
   collisionIterations: 2,
-  collisionStrength: 0.82,
-  clusterForceStrength: 0.09,
-  centerForceStrength: 0.004,
-  velocityDecay: 0.35,
+  collisionStrength: 0.9,
+  clusterForceStrength: 0.035,
+  centerForceStrength: 0.002,
+  velocityDecay: 0.38,
   alphaDecay: 0.018,
   alphaMin: 0.0015,
 } as const;
+
+export function getClusterAnchor(group: number): Cluster {
+  const preset = CLUSTERS[group];
+
+  if (preset) {
+    return preset;
+  }
+
+  const extraIndex = Math.max(0, group - CLUSTERS.length);
+  const ring = Math.floor(extraIndex / CLUSTERS.length) + 1;
+  const slot = extraIndex % CLUSTERS.length;
+  const angle = ((slot + (ring % 2) * 0.5) / CLUSTERS.length) * Math.PI * 2 + ring * 0.18;
+  const radius = COMPONENT_ANCHOR_CONFIG.fallbackRadius + (ring - 1) * COMPONENT_ANCHOR_CONFIG.fallbackRingGap;
+
+  return {
+    name: `Component ${group + 1}`,
+    x: Math.cos(angle) * radius,
+    y: Math.sin(angle) * radius,
+  };
+}

@@ -12,8 +12,33 @@ const ACCENT_COLOR = new THREE.Color(ACCENT_COLOR_HEX);
 const BACKGROUND_CLICK_DISTANCE = 6;
 const BACKGROUND_CLEAR_NODE_PADDING = 56;
 const LABEL_HOVER_BRIDGE_PADDING = 10;
+const LABEL_ZOOM_THRESHOLD = 0.72;
+const LABEL_COLLISION_PADDING = 8;
 const DEFAULT_NODE_CAPACITY = 4096;
 const DEFAULT_LINK_CAPACITY = 16384;
+
+type Rect = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+type LabelCandidate = {
+  index: number;
+  screenX: number;
+  screenY: number;
+  scale: number;
+  opacity: string;
+  isActive: boolean;
+  isLinked: boolean;
+  priority: number;
+  bounds: Rect;
+};
+
+function rectanglesOverlap(left: Rect, right: Rect): boolean {
+  return left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
+}
 
 type SmoothForceRendererCallbacks = {
   onNodeSelect?: (node: GraphNode, linkCount: number, source: NodeSelectionSource) => void;
@@ -474,7 +499,7 @@ export class SmoothForceRenderer {
   private seedNewNodePosition(node: GraphNode, links: GraphLink[], previousNodesById: Map<string, { node: GraphNode; index: number }>): void {
     const anchor = this.findExistingLinkedNode(node.id, links, previousNodesById);
     const angle = this.hashAngle(node.id);
-    const distance = 82;
+    const distance = 124;
     const x = anchor ? (anchor.x ?? anchor.renderX) + Math.cos(angle) * distance : node.x ?? 0;
     const y = anchor ? (anchor.y ?? anchor.renderY) + Math.sin(angle) * distance : node.y ?? 0;
 
@@ -626,13 +651,13 @@ export class SmoothForceRenderer {
       this.nodeGlowPositions[glowOffset] = node.renderX;
       this.nodeGlowPositions[glowOffset + 1] = node.renderY;
       this.nodeGlowPositions[glowOffset + 2] = 0.02;
-      this.nodeGlowSizes[index] = radius * 6.2;
-      this.nodeGlowOpacities[index] = 0.5 * appearance;
+      this.nodeGlowSizes[index] = radius * 4.8;
+      this.nodeGlowOpacities[index] = 0.42 * appearance;
 
       this.hoverGlowPositions[glowOffset] = node.renderX;
       this.hoverGlowPositions[glowOffset + 1] = node.renderY;
       this.hoverGlowPositions[glowOffset + 2] = 0.17;
-      this.hoverGlowSizes[index] = Math.max(node.radius * 8.4, radius * 6.8);
+      this.hoverGlowSizes[index] = Math.max(node.radius * 6.2, radius * 5.2);
       this.hoverGlowOpacities[index] = hoverOpacity < 0.01 ? 0 : hoverOpacity * appearance;
 
       this.matrix.position.set(node.renderX, node.renderY, isActive ? 0.12 : 0.04);
@@ -723,12 +748,14 @@ export class SmoothForceRenderer {
     const zoom = this.camera.zoom;
     const activeIndex = this.selectedIndex !== -1 ? this.selectedIndex : this.hoveredIndex;
     const linkedNodes = activeIndex !== -1 ? this.linkedNodesByNode[activeIndex] : null;
-    const zoomShowsLabels = zoom >= 0.78;
+    const zoomShowsLabels = zoom >= LABEL_ZOOM_THRESHOLD;
 
     if (!zoomShowsLabels && activeIndex === -1) {
       this.hideVisibleLabels();
       return;
     }
+
+    const candidates: LabelCandidate[] = [];
 
     this.nodes.forEach((node, index) => {
       const isActive = index === activeIndex;
@@ -736,7 +763,6 @@ export class SmoothForceRenderer {
       const visible = isActive || (zoomShowsLabels && (this.selectedIndex === -1 || isLinked));
 
       if (!visible) {
-        this.hideLabel(index);
         return;
       }
 
@@ -744,7 +770,6 @@ export class SmoothForceRenderer {
       const isInViewport = position.x > -1.12 && position.x < 1.12 && position.y > -1.12 && position.y < 1.12;
 
       if (!isInViewport) {
-        this.hideLabel(index);
         return;
       }
 
@@ -754,9 +779,52 @@ export class SmoothForceRenderer {
       const nodeRadiusPx = node.radius * zoom;
       const scale = 1 + this.focusLevels[index] * 0.24;
       const opacity = isActive ? "1" : "0.78";
+      const labelWidth = label.offsetWidth * scale;
+      const labelHeight = label.offsetHeight * scale;
+      const labelTop = screenY + nodeRadiusPx + 7;
+      const labelLeft = screenX - labelWidth / 2;
 
-      label.style.transform = `translate3d(${screenX.toFixed(1)}px, ${(screenY + nodeRadiusPx + 7).toFixed(1)}px, 0) translate(-50%, 0) scale(${scale.toFixed(3)})`;
-      this.showLabel(index, opacity, isActive, isLinked && !isActive);
+      candidates.push({
+        index,
+        screenX,
+        screenY: labelTop,
+        scale,
+        opacity,
+        isActive,
+        isLinked: isLinked && !isActive,
+        priority: (isActive ? 1000 : 0) + (isLinked ? 500 : 0) + this.linkedNodesByNode[index].size,
+        bounds: {
+          left: labelLeft - LABEL_COLLISION_PADDING,
+          right: labelLeft + labelWidth + LABEL_COLLISION_PADDING,
+          top: labelTop - LABEL_COLLISION_PADDING,
+          bottom: labelTop + labelHeight + LABEL_COLLISION_PADDING,
+        },
+      });
+    });
+
+    candidates.sort((left, right) => right.priority - left.priority || left.index - right.index);
+
+    const visibleLabels = new Set<number>();
+    const placedBounds: Rect[] = [];
+
+    candidates.forEach((candidate) => {
+      const collides = !candidate.isActive && placedBounds.some((bounds) => rectanglesOverlap(bounds, candidate.bounds));
+
+      if (collides) {
+        return;
+      }
+
+      const label = this.nodeLabels[candidate.index];
+      label.style.transform = `translate3d(${candidate.screenX.toFixed(1)}px, ${candidate.screenY.toFixed(1)}px, 0) translate(-50%, 0) scale(${candidate.scale.toFixed(3)})`;
+      this.showLabel(candidate.index, candidate.opacity, candidate.isActive, candidate.isLinked);
+      visibleLabels.add(candidate.index);
+      placedBounds.push(candidate.bounds);
+    });
+
+    this.labelVisible.forEach((visible, index) => {
+      if (visible && !visibleLabels.has(index)) {
+        this.hideLabel(index);
+      }
     });
   }
 
