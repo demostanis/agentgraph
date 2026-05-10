@@ -24,6 +24,7 @@ The parent node is the landing page. Title it with the project, artifact, produc
 The parent body should include:
 
 - A one-paragraph description of what the project/artifact is.
+- Core project info when known: canonical name, description, GitHub/repository URL, local path, and package/app name. Omit unknown fields instead of guessing.
 - Main technologies as inline code names with their roles.
 - Current outcome or final artifact state.
 - A compact linked map of every child node.
@@ -35,6 +36,7 @@ Parent body template:
 ```markdown
 [Project] is [description] built with `Technology`, `Technology`, and `Technology`. The final artifact [current useful state].
 
+- Project info: Name: [Name]; GitHub: [repo URL]; Path: `[path]`.
 - Main technologies: `A` for [role], `B` for [role], `C` for [role].
 - Useful entry points: `command`, `command`, `/url`.
 - Source docs: [Source Name](https://example.com) and [Other Source](https://example.com).
@@ -139,6 +141,8 @@ Treat the node graph as living documentation, not an append-only transcript.
 
 - Search the selected node directory before creating nodes.
 - If an existing node already explains the same artifact, behavior, or project, update it so the current truth is centralized.
+- If several existing nodes mention the same project, repo, product, client, person, or subject but no clear parent or overview node exists, create or update a parent node for that subject and link the related nodes from it. Three or more related nodes is a strong signal, and two nodes plus new conversation evidence can be enough when the subject is clearly durable.
+- Give these consolidation parents project-profile details gathered from the conversation and related nodes: name, short description, GitHub/repo link, local path, technologies, useful commands, live URLs, and open risks. Do not invent missing metadata.
 - Do not create old-state and new-state nodes unless the historical contrast is itself useful future knowledge.
 - Prefer clearer titles over numbered variants when title conflicts exist.
 
@@ -162,16 +166,18 @@ Important: `add-node.sh` writes the `# Title` heading for you. Pass only the nod
 1. Identify the project/artifact name from the conversation, directory, repo, package, remote, or branch when available.
 2. Read the transcript enough to identify the final artifact, technologies, key contracts, source links, reusable commands, code patterns, diagrams, and fixes.
 3. Search the node directory before adding nodes.
-4. Create the parent node first, then create supporting nodes; edit the parent if final child titles change.
-5. Use the repository scripts for every node write with the same `AG_NODES_DIR`.
-6. Run `./scripts/check-node-links.sh` with that `AG_NODES_DIR`.
-7. If links are missing, create the target node or revise the link text to an existing title.
+4. Search again for the strongest project, repo, product, client, person, or subject names. When the graph already has multiple related child-like nodes but no parent, create or update a parent profile node before adding new child nodes.
+5. Create the parent node first, then create supporting nodes; edit the parent if final child titles change.
+6. Use the repository scripts for every node write with the same `AG_NODES_DIR`.
+7. Run `./scripts/check-node-links.sh` with that `AG_NODES_DIR`.
+8. If links are missing, create the target node or revise the link text to an existing title.
 
 ## Quality Checklist
 
 Before responding, check the graph against this list:
 
 - The parent node names the project/artifact and links to every child node.
+- Recurring project or subject clusters have a parent profile node with known metadata such as description, GitHub/repo link, path, technologies, useful commands, and risks.
 - Every `[[Wiki Link]]` points to an existing node title.
 - The graph is small enough to browse quickly but preserves the main technical contracts.
 - Node bodies do not duplicate their own titles; the first sentence adds context, consequence, or rationale beyond the heading.
